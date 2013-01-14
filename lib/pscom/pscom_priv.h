@@ -498,7 +498,7 @@ int pscom_trylock(void)
 	/* TODO: Is -1 the correct choice? */
 	if (!pscom.threaded) return -1;
 	int res_mutex_lock;
-	return pthread_mutex_lock(&pscom.global_lock);
+	return pthread_mutex_trylock(&pscom.global_lock);
 }
 
 void pscom_unlock(void);
