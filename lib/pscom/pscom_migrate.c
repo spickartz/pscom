@@ -28,6 +28,7 @@
 
 static int pscom_mosquitto_initialized;
 static struct mosquitto *pscom_mosquitto_client;
+static char pscom_hostname[PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH];
 static  char pscom_mosquitto_req_topic[PSCOM_MOSQUITTO_TOPIC_LENGTH] = PSCOM_MOSQUITTO_REQ_TOPIC;
 static  char pscom_mosquitto_resp_topic[PSCOM_MOSQUITTO_TOPIC_LENGTH] = PSCOM_MOSQUITTO_RESP_TOPIC;
 
@@ -62,6 +63,14 @@ pscom_str_replace(char *search_str, char *replace_str, char *str)
 	return 0;
 }
 
+
+static
+int pscom_trigger_communication_timer(void)
+{
+	DPRINT(1, "Triggering the communication timer ... ");
+
+	return 0;
+}
 
 static
 int pscom_suspend_plugins(void)
@@ -202,6 +211,12 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
     				 void *arg, 
 				 const struct mosquitto_message *message)
 {
+	/* determine destination host for the message */
+	if (strstr(message->topic, pscom_hostname) == NULL) {
+		pscom_trigger_communication_timer();
+		return;
+	}
+
 	int pid = -1;
 	int my_pid = getpid();
 	char* msg;
@@ -225,7 +240,6 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 	} else {
 		pid = -2;
 	}
-	
 
 	if (pid == my_pid || pid == -2) {
 
@@ -414,15 +428,14 @@ int pscom_migration_init(void)
 	}
 
 	/* determine hostname and PID */
-	char hostname[PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH];
-	gethostname(hostname, PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH);
+	gethostname(pscom_hostname, PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH);
 	char pid[PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH];
 	sprintf(pid, "%d", getpid());
 
 	/* create topics */
-	pscom_str_replace("<hostname>", hostname, pscom_mosquitto_req_topic);
+	pscom_str_replace("<hostname>", "+", pscom_mosquitto_req_topic);
 	pscom_str_replace("<pid>", "+", pscom_mosquitto_req_topic);
-	pscom_str_replace("<hostname>", hostname, pscom_mosquitto_resp_topic);
+	pscom_str_replace("<hostname>", pscom_hostname, pscom_mosquitto_resp_topic);
 	pscom_str_replace("<pid>", pid, pscom_mosquitto_resp_topic);
 
 	/* subscribe to the migration command topic */
