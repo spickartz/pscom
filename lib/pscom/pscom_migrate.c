@@ -22,10 +22,13 @@
 #include <stdlib.h>
 #include <netinet/tcp.h>
 #include <errno.h>
+#include <signal.h>
+#include <time.h>
 
 #define _PSCOM_SUPPORT_MIGRATION
 #ifdef _PSCOM_SUPPORT_MIGRATION
 
+static timer_t pscom_timer;
 static int pscom_mosquitto_initialized;
 static struct mosquitto *pscom_mosquitto_client;
 static char pscom_hostname[PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH];
@@ -63,11 +66,34 @@ pscom_str_replace(char *search_str, char *replace_str, char *str)
 	return 0;
 }
 
+static
+void pscom_trigger_progress(union sigval sv)
+{
+	DPRINT(1, "Try to make progress in communication ... ");
+
+	return;
+}
 
 static
 int pscom_trigger_communication_timer(void)
 {
-	DPRINT(1, "Triggering the communication timer ... ");
+	/* arm the timer */
+	struct itimerspec timerspec = {
+		.it_interval = {
+			.tv_sec = 1,
+		},
+		.it_value = {
+			.tv_sec = 1,
+		},
+	};
+
+	if (timer_settime(pscom_timer, 0, &timerspec, NULL) < 0) {
+		DPRINT(1, "%s %d: ERROR: timer_settime() failed -- %s (%d)\n",
+		       __FILE__, __LINE__,
+		       strerror(errno),
+		       errno);
+		exit(-1);
+	}
 
 	return 0;
 }
@@ -461,7 +487,23 @@ int pscom_migration_init(void)
 	/* set the subscription callback */
 	mosquitto_message_callback_set(pscom_mosquitto_client,
 				       &pscom_message_callback);
-	
+
+	/* create timer for remote migration request */
+	struct sigevent sev = {
+		.sigev_notify = SIGEV_THREAD,
+		.sigev_notify_function = pscom_trigger_progress,
+		.sigev_notify_attributes = NULL,
+	};
+
+	/* create a new timer */
+	if (timer_create(CLOCK_REALTIME, &sev,  &pscom_timer) < 0) {
+		DPRINT(1, "%s %d: ERROR: timer_create() failed -- %s (%d)\n",
+		    __FILE__, __LINE__,
+		    strerror(errno),
+		    errno);
+		exit(-1);
+	}
+
 	/* start the communication loop */
 	err = mosquitto_loop_start(pscom_mosquitto_client);
 	if ( err != MOSQ_ERR_SUCCESS) {
