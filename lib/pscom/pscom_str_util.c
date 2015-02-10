@@ -211,6 +211,9 @@ pscom_err_t pscom_connect_socket_str(pscom_connection_t *connection, const char 
 	res = pscom_parse_socket_ondemand_str(socket_str, &nodeid, &portno, &name);
 	if (res) goto err_parse;
 
+	connection->nodeid = nodeid;
+	connection->portno = portno;
+
 	if (!name[0]) {
 		return pscom_connect(connection, nodeid, portno);
 	} else {

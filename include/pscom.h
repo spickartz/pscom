@@ -257,6 +257,8 @@ struct PSCOM_connection
 #else
 	char		userdata[0];
 #endif
+	int nodeid;
+	int portno;
 };
 
 
@@ -324,6 +326,8 @@ void pscom_flush(pscom_connection_t *connection);
 /* cancel all active send/recv requests and close the connection */
 void pscom_close_connection(pscom_connection_t *connection);
 
+void pscom_shutdown_connection(pscom_connection_t *connection);
+void pscom_resume_connection(pscom_connection_t *connection);
 
 /* PSCOM_Close_Socket() close all connections. */
 void pscom_close_socket(pscom_socket_t *socket);

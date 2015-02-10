@@ -12,6 +12,7 @@
 
 #include "pscom_priv.h"
 #include "pscom_io.h"
+#include "pscom_con.h"
 #include "pscom_queues.h"
 #include "pscom_req.h"
 #include <stdlib.h>
@@ -61,6 +62,20 @@ void                       _pscom_send_inplace(pscom_con_t *con, unsigned msg_ty
 int                        pscom_read_is_at_message_start(pscom_con_t *con);
 void                       pscom_read_get_buf(pscom_con_t *con, char **buf, size_t *len);
 void                       pscom_read_done(pscom_con_t *con, char *buf, size_t len);
+
+
+void pscom_post_shutdown_msg(pscom_con_t *con)
+{
+	pscom_req_t * req;
+
+	req = pscom_req_create(0, sizeof(pscom_shutdown_msg_t));
+
+	pscom_req_prepare_send(req, PSCOM_MSGTYPE_SHUTDOWN_REQ);
+	_pscom_sendq_enq(con, req);
+
+	pscom_wait(&req->pub);
+	pscom_req_free(req);
+}
 
 
 void pscom_req_prepare_recv(pscom_req_t *req, const pscom_header_net_t *nh, pscom_connection_t *connection)
@@ -561,6 +576,98 @@ pscom_req_t *_pscom_get_rendezvous_fin_receiver(pscom_con_t *con, pscom_header_n
 	return NULL;
 }
 
+static
+void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
+{
+	pscom_req_t *req = get_req(request);
+	pscom_con_t *con = get_con(request->connection);
+	pscom_connection_t *connection = request->connection;
+	pscom_sock_t *sock = get_sock(connection->socket);
+
+	con->write_suspend(con);
+
+	printf(">>> SHUTDOWN ACK SENT! <<<\n");
+
+	pscom_request_free(request);
+
+#if 1
+	con->close(con);
+
+	list_del(&con->next);
+
+	strcpy(connection->socket->local_con_info.name, "server__");
+
+	pscom_listen(connection->socket, 7100 /*connection->portno*/);
+
+	connection->type = PSCOM_CON_TYPE_ONDEMAND;
+
+	pscom_connect_ondemand(connection, 0 /*-2040616540*/, 0 /*7101*/, "client__");
+#endif
+}
+
+static
+void pscom_shutdown_req_receiver_io_done(pscom_request_t *request)
+{
+	pscom_req_t *req = get_req(request);
+	pscom_con_t *con = get_con(request->connection);
+
+	printf(">>> SHUTDOWN REQ RECEIVED! <<<\n");
+
+	con->read_suspend(con);
+
+	req->pub.ops.io_done = pscom_shutdown_ack_sender_io_done;
+
+	pscom_post_send_direct(req, PSCOM_MSGTYPE_SHUTDOWN_ACK);
+}
+
+static
+void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
+{
+	pscom_req_t *req = get_req(request);
+	pscom_con_t *con = get_con(request->connection);
+	pscom_connection_t *connection = request->connection;
+
+	printf(">>> SHUTDOWN ACK RECEIVED! <<<\n");
+
+	con->read_suspend(con);
+
+	pscom_request_free(request);
+
+#if 1
+	con->close(con);
+
+	list_del(&con->next);
+
+	strcpy(connection->socket->local_con_info.name, "client__");
+
+	pscom_listen(connection->socket, 0 /*connection->portno*/);
+
+	connection->type = PSCOM_CON_TYPE_ONDEMAND;
+
+	pscom_connect_ondemand(connection, connection->nodeid, connection->portno, "server__");
+#endif
+}
+
+
+static
+pscom_req_t *pscom_get_shutdown_receiver(pscom_con_t *con, pscom_header_net_t *nh)
+{
+	pscom_req_t *req;
+
+	req = pscom_req_create(nh->xheader_len, sizeof(pscom_shutdown_msg_t));
+
+	pscom_shutdown_msg_t *shutdown_msg = (pscom_shutdown_msg_t *) req->pub.user;
+
+	if(nh->msg_type == PSCOM_MSGTYPE_SHUTDOWN_REQ) {
+
+		req->pub.ops.io_done = pscom_shutdown_req_receiver_io_done;
+	} else {
+		req->pub.ops.io_done = pscom_shutdown_ack_receiver_io_done;
+	}
+
+	return req;
+}
+
 
 static
 pscom_req_t *_pscom_get_eof_receiver(pscom_con_t *con, pscom_header_net_t *nh)
@@ -608,6 +715,10 @@ pscom_req_t *_pscom_get_recv_req(pscom_con_t *con, pscom_header_net_t *nh)
 			break;
 		case PSCOM_MSGTYPE_EOF:
 			req = _pscom_get_eof_receiver(con, nh);
+			break;
+		case PSCOM_MSGTYPE_SHUTDOWN_ACK:
+		case PSCOM_MSGTYPE_SHUTDOWN_REQ:
+			req = pscom_get_shutdown_receiver(con, nh);
 			break;
 		default:
 			DPRINT(0, "Receive unknown msg_type %u", nh->msg_type);

@@ -257,7 +257,7 @@ int ufd_poll(ufd_t *ufd, int timeout)
 		if (timeout == 0) return 0;
 		if (timeout < 0) {
 			static int warn = 0;
-			if (!warn) {
+			if (0 && !warn) {
 				fprintf(stderr, "Deadlock detected! Process %u will wait forever.\n",
 					getpid());
 				fprintf(stderr, "('wait' called without outstanding send or recv requests).\n");

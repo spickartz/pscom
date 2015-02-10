@@ -532,6 +532,8 @@ void shm_close(pscom_con_t *con)
 
 		assert(list_empty(&con->poll_next_send));
 		assert(list_empty(&con->poll_reader.next));
+
+		printf(">>> SHM PLUGIN CLOSED! <<<\n");
 	}
 }
 

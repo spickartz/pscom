@@ -166,30 +166,56 @@ void pscom_poll_write_stop(pscom_con_t *con)
 {
 	/* it's save to dequeue more then once */
 	list_del_init(&con->poll_next_send);
+
+	con->write_is_signaled = 0;
 }
 
 
 void pscom_poll_write_start(pscom_con_t *con)
 {
-	if (list_empty(&con->poll_next_send)) {
-		list_add_tail(&con->poll_next_send, &pscom.poll_sender);
+	if(!con->write_is_suspended) {
+		if (list_empty(&con->poll_next_send)) {
+			list_add_tail(&con->poll_next_send, &pscom.poll_sender);
+		}
+		con->do_write(con);
+		/* Dont do anything after this line.
+		   do_write() can reenter pscom_poll_write_start()! */
 	}
-	con->do_write(con);
-	/* Dont do anything after this line.
-	   do_write() can reenter pscom_poll_write_start()! */
+	con->write_is_signaled = 1;
 }
+
+void pscom_poll_write_suspend(pscom_con_t *con)
+{
+	/* it's save to dequeue more then once */
+	list_del_init(&con->poll_next_send);
+
+	con->write_is_suspended = 1;
+}
+
+void pscom_poll_write_resume(pscom_con_t *con)
+{
+	con->write_is_suspended = 0;
+
+	if(con->write_is_signaled) {
+		con->write_start(con);
+	}
+}
+
 
 
 void pscom_poll_read_start(pscom_con_t *con)
 {
-	pscom_poll_reader_t *reader = &con->poll_reader;
-	if (list_empty(&reader->next)) {
-		list_add_tail(&reader->next, &pscom.poll_reader);
-	}
+	if(!con->read_is_suspended) {
+		pscom_poll_reader_t *reader = &con->poll_reader;
+		if (list_empty(&reader->next)) {
+			list_add_tail(&reader->next, &pscom.poll_reader);
+		}
 
-	reader->do_read(reader);
-	/* Dont do anything after this line.
-	   do_read() can reenter pscom_poll_read_start()! */
+		reader->do_read(reader);
+		/* Dont do anything after this line.
+		   do_read() can reenter pscom_poll_read_start()! */
+	}
+	con->read_is_signaled = 1;
 }
 
 
@@ -199,6 +225,27 @@ void pscom_poll_read_stop(pscom_con_t *con)
 
 	/* it's save to dequeue more then once */
 	list_del_init(&reader->next);
+
+	con->read_is_signaled  = 0;
+}
+
+void pscom_poll_read_suspend(pscom_con_t *con)
+{
+	pscom_poll_reader_t *reader = &con->poll_reader;
+
+	/* it's save to dequeue more then once */
+	list_del_init(&reader->next);
+
+	con->read_is_suspended = 1;
+}
+
+void pscom_poll_read_resume(pscom_con_t *con)
+{
+	con->read_is_suspended = 0;
+
+	if(con->read_is_signaled) {
+		con->read_start(con);
+	}
 }
 
 

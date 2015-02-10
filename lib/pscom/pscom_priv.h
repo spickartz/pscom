@@ -215,6 +215,18 @@ typedef struct pscom_rendezvous_data {
 } pscom_rendezvous_data_t;
 
 
+typedef struct pscom_shutdown_msg {
+	int info;
+#if 0
+	union {
+		pscom_shutdown_msg_shm_t	shm;
+		pscom_shutdown_msg_dapl_t	dapl;
+		pscom_shutdown_msg_extoll_t	extoll;
+	} arch;
+#endif
+} pscom_shutdown_msg_t;
+
+
 #define MAGIC_CONNECTION	0x78626c61
 struct PSCOM_con
 {
@@ -226,6 +238,16 @@ struct PSCOM_con
 	void (*write_stop)(pscom_con_t *con);
 	void (*do_write)(pscom_con_t *con); // used only if .write_start = pscom_poll_write_start
 	void (*close)(pscom_con_t *con);
+
+	void (*write_suspend)(pscom_con_t *con);
+	void (*write_resume)(pscom_con_t *con);
+	int write_is_suspended;
+	int write_is_signaled;
+
+	void (*read_suspend)(pscom_con_t *con);
+	void (*read_resume)(pscom_con_t *con);
+	int read_is_suspended;
+	int read_is_signaled;
 
 	/* RMA functions: */
 	/* register mem region for RMA. should return size of
@@ -425,6 +447,8 @@ extern pscom_t pscom;
 #define PSCOM_MSGTYPE_BCAST	6
 #define PSCOM_MSGTYPE_BARRIER	7
 #define PSCOM_MSGTYPE_EOF	8
+#define PSCOM_MSGTYPE_SHUTDOWN_REQ	9
+#define PSCOM_MSGTYPE_SHUTDOWN_ACK	10
 
 extern int mt_locked;
 
@@ -534,8 +558,13 @@ void _pscom_send_inplace(pscom_con_t *con, unsigned msg_type,
 
 void pscom_poll_write_start(pscom_con_t *con);
 void pscom_poll_write_stop(pscom_con_t *con);
+void pscom_poll_write_suspend(pscom_con_t *con);
+void pscom_poll_write_resume(pscom_con_t *con);
+
 void pscom_poll_read_start(pscom_con_t *con);
 void pscom_poll_read_stop(pscom_con_t *con);
+void pscom_poll_read_suspend(pscom_con_t *con);
+void pscom_poll_read_resume(pscom_con_t *con);
 
 int pscom_progress(int timeout);
 

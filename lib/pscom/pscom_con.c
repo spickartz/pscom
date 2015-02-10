@@ -273,6 +273,22 @@ void pscom_con_close(pscom_con_t *con)
 	}
 }
 
+void pscom_post_shutdown_msg(pscom_con_t *con);
+void pscom_con_shutdown(pscom_con_t *con)
+{
+	/* Send SHUTDOWN message and hold back all further send requests: */
+
+	pscom_post_shutdown_msg(con);
+
+	con->write_suspend(con);
+}
+
+void pscom_con_resume(pscom_con_t *con)
+{
+	con->write_resume(con);
+	con->read_resume(con);
+}
+
 
 void pscom_con_error(pscom_con_t *con, pscom_op_t operation, pscom_err_t error)
 {
@@ -326,6 +342,8 @@ pscom_con_t *pscom_con_create(pscom_sock_t *sock)
 	con->pub.userdata_size = sock->pub.connection_userdata_size;
 	con->pub.state = PSCOM_CON_STATE_CLOSED;
 	con->pub.type = PSCOM_CON_TYPE_NONE;
+	con->pub.portno = 0;
+	con->pub.nodeid = 0;
 
 	con->recv_req_cnt = 0;
 	INIT_LIST_HEAD(&con->next);
@@ -355,6 +373,18 @@ pscom_con_t *pscom_con_create(pscom_sock_t *sock)
 	con->poll_reader.do_read = NULL;
 	con->do_write = NULL;
 	con->close = pscom_no_rw_start_stop;
+
+
+	con->write_suspend = pscom_poll_write_suspend;
+	con->write_resume = pscom_poll_write_resume;
+	con->write_is_suspended = 0;
+	con->write_is_signaled = 0;
+
+	con->read_suspend = pscom_poll_read_suspend;
+	con->read_resume = pscom_poll_read_resume;
+	con->read_is_suspended = 0;
+	con->read_is_signaled = 0;
+
 	/* RMA */
 	con->rma_mem_register = NULL;
 	con->rma_mem_deregister = NULL;
@@ -698,6 +728,21 @@ void pscom_close_connection(pscom_connection_t *connection)
 	} pscom_unlock();
 }
 
+void pscom_shutdown_connection(pscom_connection_t *connection)
+{
+	pscom_lock(); {
+		pscom_con_t *con = get_con(connection);
+		pscom_con_shutdown(con);
+	} pscom_unlock();
+}
+
+void pscom_resume_connection(pscom_connection_t *connection)
+{
+	pscom_lock(); {
+		pscom_con_t *con = get_con(connection);
+		pscom_con_resume(con);
+	} pscom_unlock();
+}
 
 pscom_connection_t *pscom_get_next_connection(pscom_socket_t *socket, pscom_connection_t *connection)
 {

@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <popt.h>
 #include <ctype.h>
+#include <unistd.h>
 
 #include "pscom.h"
 
@@ -31,11 +32,11 @@ const char *arg_server = "localhost:7100";
 int arg_client = 0;
 int arg_lport = 7100;
 
-int arg_loops = 1024;
+int arg_loops = 128; //1024;
 int arg_maxtime = 3000;
 #define MAX_XHEADER 100
 int arg_xheader = 12;
-int arg_maxmsize = 4 * 1024 * 1024;
+int arg_maxmsize = 65536; //4 * 1024 * 1024;
 int arg_run_once = 0;
 int arg_verbose = 0;
 int arg_histo = 0;
@@ -67,7 +68,7 @@ void parse_opt(int argc, char **argv)
 		{ "histo" , 'i', POPT_ARGFLAG_OR | POPT_ARG_VAL,
 		  &arg_histo, 1, "Measure each ping pong", NULL },
 
-		{ "once" , '1', POPT_ARGFLAG_OR | POPT_ARG_VAL,
+	{ "once" , '1', POPT_ARGFLAG_OR | POPT_ARG_VAL,
 		  &arg_run_once, 1, "stop after one client", NULL },
 
 		{ "verbose"	, 'v', POPT_ARG_NONE,
@@ -127,6 +128,11 @@ unsigned long getusec(void)
 	return (tv.tv_usec+tv.tv_sec*1000000);
 }
 
+static pscom_connection_t *connection_to_be_resumed = NULL;
+void alarm_handler(int signum){
+	printf("### CALLING RESUME... ###\n");
+	pscom_resume_connection(connection_to_be_resumed);
+}
 
 static
 void run_pp_server(pscom_connection_t *con)
@@ -160,6 +166,13 @@ void run_pp_server(pscom_connection_t *con)
 
 		req->xheader_len = req->header.xheader_len;
 		req->data_len = req->header.data_len;
+
+		if(req->data_len == 724) {
+			connection_to_be_resumed = con;
+			signal(SIGALRM, alarm_handler);
+			alarm(2);
+		}
+
 		pscom_post_send(req);
 
 		pscom_wait(req);
@@ -294,6 +307,14 @@ void do_pp_client(pscom_connection_t *con)
 
 		/* warmup, for sync */
 		run_pp_c(con, 2, 2, 2);
+
+		if(msgsize == 1024) {
+			printf("### CALLING SHUTDOWN... ###\n");
+			pscom_shutdown_connection(con);
+			connection_to_be_resumed = con;
+			signal(SIGALRM, alarm_handler);
+			alarm(2);
+		}
 
 		if (!arg_histo) {
 			t1 = getusec();

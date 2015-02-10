@@ -74,31 +74,37 @@ void pscom_ondemand_direct_connect(pscom_con_t *con)
 static
 void pscom_ondemand_write_start(pscom_con_t *con)
 {
-	if (pscom_name_is_lower(con->arch.ondemand.name, con->pub.socket->local_con_info.name)) {
-		pscom_ondemand_read_start(con); // be prepared for the back connect
-		pscom_ondemand_indirect_connect(con);
-	} else {
-		pscom_sock_t *sock = get_sock(con->pub.socket);
+	if(!con->write_is_suspended) {
+		if (pscom_name_is_lower(con->arch.ondemand.name, con->pub.socket->local_con_info.name)) {
+			pscom_ondemand_read_start(con); // be prepared for the back connect
+			pscom_ondemand_indirect_connect(con);
+		} else {
+			pscom_sock_t *sock = get_sock(con->pub.socket);
 
-		pscom_listener_user_inc(&sock->listen); // listen until we have the connection
+			pscom_listener_user_inc(&sock->listen); // listen until we have the connection
 
-		pscom_ondemand_direct_connect(con);
+			pscom_ondemand_direct_connect(con);
 
-		pscom_listener_user_dec(&sock->listen);
+			pscom_listener_user_dec(&sock->listen);
+		}
 	}
+	con->write_is_signaled = 1;
 }
 
 
 static
 void pscom_ondemand_read_start(pscom_con_t *con)
 {
-	if (!con->arch.ondemand.active) {
-		/* enable listen */
-		pscom_sock_t *sock = get_sock(con->pub.socket);
+	if(!con->read_is_suspended) {
+		if (!con->arch.ondemand.active) {
+			/* enable listen */
+			pscom_sock_t *sock = get_sock(con->pub.socket);
 
-		con->arch.ondemand.active = 1;
-		pscom_listener_active_inc(&sock->listen);
+			con->arch.ondemand.active = 1;
+			pscom_listener_active_inc(&sock->listen);
+		}
 	}
+	con->read_is_signaled = 1;
 }
 
 
