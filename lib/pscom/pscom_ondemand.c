@@ -187,7 +187,7 @@ pscom_err_t pscom_con_connect_ondemand(pscom_con_t *con,
 	con->read_stop = pscom_ondemand_read_stop;
 	con->close = pscom_ondemand_close;
 
-	assert(list_empty(&con->next));
+//	assert(list_empty(&con->next));
 	list_add_tail(&con->next, &sock->connections);
 
 	pscom_con_setup(con);
