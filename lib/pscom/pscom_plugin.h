@@ -20,6 +20,7 @@ typedef struct pscom_plugin {
 	unsigned int version; // must be equal to PSCOM_PLUGIN_VERSION
 	unsigned int arch_id;	// PSCOM_ARCH_xyz
 	unsigned int priority;	// default priority (0 == disabled, prefer higher values)
+	unsigned int properties;// bitmask to define properties (see pscom_priv.h)
 	unsigned int user_prio; // (0 == disabled, prefer higher values) Set by env PSP_{ARCH}
 
 	void	(*init)(void);

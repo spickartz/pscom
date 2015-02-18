@@ -39,4 +39,7 @@ pscom_con_t *pscom_ondemand_find_con(pscom_sock_t *sock, const char name[8]);
 pscom_con_t *pscom_ondemand_get_con(pscom_sock_t *sock, const char name[8]);
 void pscom_ondemand_indirect_connect(pscom_con_t *con);
 
+void pscom_con_shutdown(pscom_con_t *con);
+void pscom_con_resume(pscom_con_t *con);
+
 #endif /* _PSCOM_CON_H_ */

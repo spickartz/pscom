@@ -360,6 +360,12 @@ struct PSCOM_sock
 	pscom_socket_t		pub;
 };
 
+typedef enum PSCOM_Migration_state {
+	PSCOM_MIGRATION_INACTIVE=0,
+	PSCOM_MIGRATION_REQ,
+	PSCOM_MIGRATION_IN_PROGRESS,
+	PSCOM_MIGRATION_DONE,
+} pscom_migration_state_t;
 
 struct PSCOM
 {
@@ -370,6 +376,7 @@ struct PSCOM
 	pthread_mutex_t		global_lock;
 	pthread_mutex_t		lock_requests;
 	int			threaded;	// Bool: multithreaded? (=Use locking)
+	volatile pscom_migration_state_t        migration_state;        // Did we receive an interrupt?
 
 	struct list_head	io_doneq; // List of pscom_req_t.next
 
@@ -449,6 +456,12 @@ extern pscom_t pscom;
 #define PSCOM_MSGTYPE_EOF	8
 #define PSCOM_MSGTYPE_SHUTDOWN_REQ	9
 #define PSCOM_MSGTYPE_SHUTDOWN_ACK	10
+
+/*
+ * Plugin properties
+ */
+#define PSCOM_PLUGIN_PROP_EMPTY                0x00000000
+#define PSCOM_PLUGIN_PROP_NOT_MIGRATABLE       0x00000001
 
 extern int mt_locked;
 

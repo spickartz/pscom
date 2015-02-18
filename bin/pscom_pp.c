@@ -167,11 +167,13 @@ void run_pp_server(pscom_connection_t *con)
 		req->xheader_len = req->header.xheader_len;
 		req->data_len = req->header.data_len;
 
+#if 0
 		if(req->data_len == 724) {
 			connection_to_be_resumed = con;
 			signal(SIGALRM, alarm_handler);
 			alarm(2);
 		}
+#endif
 
 		pscom_post_send(req);
 
@@ -308,6 +310,7 @@ void do_pp_client(pscom_connection_t *con)
 		/* warmup, for sync */
 		run_pp_c(con, 2, 2, 2);
 
+#if 0
 		if(msgsize == 1024) {
 			printf("### CALLING SHUTDOWN... ###\n");
 			pscom_shutdown_connection(con);
@@ -315,6 +318,7 @@ void do_pp_client(pscom_connection_t *con)
 			signal(SIGALRM, alarm_handler);
 			alarm(2);
 		}
+#endif
 
 		if (!arg_histo) {
 			t1 = getusec();
@@ -343,6 +347,8 @@ void do_pp_client(pscom_connection_t *con)
 			}
 			if (loops < 1) loops = 1;
 		}
+
+		if((int)(ms + 0.5) >= arg_maxmsize) ms = 1.4142135;
 	}
 
 	return;

@@ -276,10 +276,11 @@ void pscom_con_close(pscom_con_t *con)
 void pscom_post_shutdown_msg(pscom_con_t *con);
 void pscom_con_shutdown(pscom_con_t *con)
 {
-	/* Send SHUTDOWN message and hold back all further send requests: */
+	/* Send SHUTDOWN message */
 
 	pscom_post_shutdown_msg(con);
 
+	/* hold back all further send requests */
 	con->write_suspend(con);
 }
 
