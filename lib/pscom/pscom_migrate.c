@@ -99,7 +99,7 @@ int pscom_suspend_plugins(void)
 			       __FILE__, 
 			       __LINE__,
 			       plugin->name);
-			plugin->destroy();
+			//plugin->destroy();
 			DPRINT(1, 
 			       "%s %u: Successfully destroyed '%s'!", 
 			       __FILE__, 
@@ -162,10 +162,26 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
     				 void *arg, 
 				 const struct mosquitto_message *message)
 {
-	if (pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
-		pscom.migration_state = PSCOM_MIGRATION_REQ;
-	} else if (pscom.migration_state == PSCOM_MIGRATION_IN_PROGRESS) {
-		pscom.migration_state = PSCOM_MIGRATION_DONE;
+	char my_pid[10];
+	sprintf(my_pid, "%d", getpid());
+
+	printf("CALLBACK: %s VS %s\n", (char*)message->payload, my_pid);
+
+	if(strncmp((char*)message->payload, my_pid, 10)==0) {
+
+		if (pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
+			pscom.migration_state = PSCOM_MIGRATION_REQ;
+			printf("STATE: PSCOM_MIGRATION_INACTIVE -> PSCOM_MIGRATION_REQ\n");
+		} else if (pscom.migration_state == PSCOM_MIGRATION_IN_PROGRESS) {
+			pscom.migration_state = PSCOM_MIGRATION_DONE;
+			printf("STATE: PSCOM_MIGRATION_IN_PROGRESS -> PSCOM_MIGRATION_DONE\n");
+		} else if (pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
+			printf("STATE: PSCOM_MIGRATION_INACTIVE\n");
+		} else if (pscom.migration_state == PSCOM_MIGRATION_DONE) {
+			printf("STATE: PSCOM_MIGRATION_DONE\n");
+		} else {
+			printf("STATE: !UNKNOWN!\n");
+		}
 	}
 }
 
@@ -181,8 +197,6 @@ void pscom_migration_handle_resume_req(void)
 
 void pscom_migration_handle_shutdown_req(void)
 {
-	if(!getenv("HANDLE_SHUTDOWN")) return;
-
 	/* change migration state */
 	pscom.migration_state = PSCOM_MIGRATION_IN_PROGRESS;
 
@@ -260,6 +274,8 @@ int pscom_migration_init(void)
 		       errno, 
 		       strerror(errno));
 		return PSCOM_ERR_STDERROR;
+	} else {
+		DPRINT(1, "Connected to the Mosquitto broker");
 	}
 
 	/* subscribe to the migration command topic */
@@ -274,11 +290,13 @@ int pscom_migration_init(void)
 		DPRINT(1, "%s %d: ERROR: Could not subscribe to '%s' - %d"
 		       "(%d [%s])", 
 		       __FILE__, __LINE__,
-		       PSCOM_MOSQUITTO_TOPIC,
+		       topic,
 		       err,
 		       errno, 
 		       strerror(errno));
 		return PSCOM_ERR_STDERROR;
+	} else {
+		DPRINT(1, "Sucessfuly subscribed to '%s'", topic);
 	}
 
 	/* set the subscription callback */

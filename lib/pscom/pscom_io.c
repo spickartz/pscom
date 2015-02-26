@@ -20,6 +20,11 @@
 #include "pscom_str_util.h"
 #include "pscom_util.h"
 
+#define PSCOM_PORT_ACK_SENDER          5046
+#define PSCOM_PORT_ACK_RECEIVER        5016
+#define PSCOM_NAME_ACK_SENDER          "server__"
+#define PSCOM_NAME_ACK_RECEIVER        "client__"
+
 static inline unsigned int header_length(pscom_header_net_t *header);
 static inline int          header_complete(void *buf, unsigned int size);
 static inline int          is_recv_req_done(pscom_req_t *req);
@@ -68,11 +73,12 @@ void pscom_post_shutdown_msg(pscom_con_t *con)
 {
 	pscom_req_t * req;
 
+	/* prepare and send SHUTDOWN_REQ */
 	req = pscom_req_create(0, sizeof(pscom_shutdown_msg_t));
+	req->pub.connection = &con->pub;
+	pscom_post_send_direct(req, PSCOM_MSGTYPE_SHUTDOWN_REQ);
 
-	pscom_req_prepare_send(req, PSCOM_MSGTYPE_SHUTDOWN_REQ);
-	_pscom_sendq_enq(con, req);
-
+	/* wait for request to be processed */
 	pscom_wait(&req->pub);
 	pscom_req_free(req);
 }
@@ -579,30 +585,42 @@ pscom_req_t *_pscom_get_rendezvous_fin_receiver(pscom_con_t *con, pscom_header_n
 static
 void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 {
-	pscom_req_t *req = get_req(request);
+	pscom_err_t rc;
 	pscom_con_t *con = get_con(request->connection);
 	pscom_connection_t *connection = request->connection;
-	pscom_sock_t *sock = get_sock(connection->socket);
-
-	con->write_suspend(con);
+	pscom_socket_t *socket = connection->socket;
 
 	printf(">>> SHUTDOWN ACK SENT! <<<\n");
 
+	con->write_suspend(con);
+
 	pscom_request_free(request);
 
-#if 1
+	/* close the connection */
 	con->close(con);
+	list_del_init(&con->next);
 
-	list_del(&con->next);
+	strcpy(connection->socket->local_con_info.name, PSCOM_NAME_ACK_SENDER);
 
-	strcpy(connection->socket->local_con_info.name, "server__");
+	/* start to listen */
+	if ((rc = pscom_listen(connection->socket, PSCOM_PORT_ACK_SENDER))) {
+		DPRINT(1, "ERROR: Could not start listening - '%s' (%d)\n",
+		       pscom_err_str(rc),
+		       rc);
+	}
 
-	pscom_listen(connection->socket, 7100 /*connection->portno*/);
+	if ((rc = pscom_connect_ondemand(connection, 
+					 connection->remote_con_info.node_id,
+					 PSCOM_PORT_ACK_RECEIVER,
+					 PSCOM_NAME_ACK_RECEIVER))) {
+		DPRINT(1,"ERROR: Could not connect - '%s' (%d)\n",
+		       pscom_err_str(rc),
+		       rc);
+		exit(-1);
+	}
 
-	connection->type = PSCOM_CON_TYPE_ONDEMAND;
-
-	pscom_connect_ondemand(connection, 0 /*-2040616540*/, 0 /*7101*/, "client__");
-#endif
+	pscom_con_resume(con);
+	pscom_stop_listen(socket);
 }
 
 static
@@ -623,9 +641,10 @@ void pscom_shutdown_req_receiver_io_done(pscom_request_t *request)
 static
 void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 {
-	pscom_req_t *req = get_req(request);
+	pscom_err_t rc;
 	pscom_con_t *con = get_con(request->connection);
 	pscom_connection_t *connection = request->connection;
+	pscom_socket_t *socket = connection->socket;
 
 	printf(">>> SHUTDOWN ACK RECEIVED! <<<\n");
 
@@ -633,19 +652,34 @@ void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 
 	pscom_request_free(request);
 
-#if 1
+	/* close the connection */
 	con->close(con);
+	list_del_init(&con->next);
 
-	list_del(&con->next);
+	strcpy(connection->socket->local_con_info.name, PSCOM_NAME_ACK_RECEIVER);
 
-	strcpy(connection->socket->local_con_info.name, "client__");
+	/* start to listen */
+	if ((rc = pscom_listen(connection->socket, PSCOM_PORT_ACK_RECEIVER))) {
+		DPRINT(1, "ERROR: Could not start listening - '%s' (%d)\n",
+		       pscom_err_str(rc),
+		       rc);
+	}
 
-	pscom_listen(connection->socket, 0 /*connection->portno*/);
+	printf("--------------------\n");
+	printf("nodeid %d\n", connection->remote_con_info.node_id);
 
-	connection->type = PSCOM_CON_TYPE_ONDEMAND;
-
-	pscom_connect_ondemand(connection, connection->nodeid, connection->portno, "server__");
-#endif
+	if ((rc = pscom_connect_ondemand(connection, 
+					 connection->remote_con_info.node_id,
+					 PSCOM_PORT_ACK_SENDER,
+					 PSCOM_NAME_ACK_SENDER))) {
+		DPRINT(1,"ERROR: Could not connect - '%s' (%d)\n",
+		       pscom_err_str(rc),
+		       rc);
+		exit(-1);
+	}
+	
+	/* stop listening */
+	pscom_stop_listen(socket);
 }
 
 
