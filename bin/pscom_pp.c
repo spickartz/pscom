@@ -164,6 +164,8 @@ void run_pp_server(pscom_connection_t *con)
 			       pscom_dumpstr(req->data, req->header.data_len));
 		}
 
+		sched_yield();
+
 		req->xheader_len = req->header.xheader_len;
 		req->data_len = req->header.data_len;
 
@@ -215,6 +217,7 @@ int run_pp_c(pscom_connection_t *con, int msize, int xsize, int loops)
 
 		// printf("SEND %d data :%s\n", msize,
 		//       pscom_dumpstr(sbuf, MIN(msize, 16)));
+		sched_yield();
 		pscom_post_recv(rreq);
 
 		pscom_wait(sreq);
