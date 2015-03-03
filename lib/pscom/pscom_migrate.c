@@ -165,31 +165,31 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 	char my_pid[10];
 	sprintf(my_pid, "%d", getpid());
 
-	printf("CALLBACK: %s VS %s\n", (char*)message->payload, my_pid);
+	DPRINT(1, "\nINFO: Got MQTT message: %s (vs %s = my pid)\n", (char*)message->payload, my_pid);
 
 	if(strncmp((char*)message->payload, my_pid, 10)==0) {
 
 		if (pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
 			pscom.migration_state = PSCOM_MIGRATION_REQ;
-			printf("STATE: PSCOM_MIGRATION_INACTIVE -> PSCOM_MIGRATION_REQ\n");
+			DPRINT(2, "\nSTATE: PSCOM_MIGRATION_INACTIVE -> PSCOM_MIGRATION_REQ");
 		} else if (pscom.migration_state == PSCOM_MIGRATION_IN_PROGRESS) {
 			pscom.migration_state = PSCOM_MIGRATION_DONE;
-			printf("STATE: PSCOM_MIGRATION_IN_PROGRESS -> PSCOM_MIGRATION_DONE\n");
+			DPRINT(2, "STATE: PSCOM_MIGRATION_IN_PROGRESS -> PSCOM_MIGRATION_DONE");
 		} else if (pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
-			printf("STATE: PSCOM_MIGRATION_INACTIVE\n");
+			DPRINT(2, "STATE: PSCOM_MIGRATION_INACTIVE");
 		} else if (pscom.migration_state == PSCOM_MIGRATION_DONE) {
-			printf("STATE: PSCOM_MIGRATION_DONE\n");
+			DPRINT(2, "STATE: PSCOM_MIGRATION_DONE");
 		} else {
-			printf("STATE: !UNKNOWN!\n");
+			DPRINT(2, "STATE: !UNKNOWN!");
 		}
 	}
 }
 
 void pscom_migration_handle_resume_req(void)
 {
-	printf(">>> CALLING RESUME... ###\n");
+	DPRINT(1, "INFO: Handling resume request ...\n");
 	pscom_resume_non_migratable_plugins();
-	printf(">>> RESUME COMPLETE... ###\n");
+	DPRINT(1, "INFO: Resume Complete!\n");
 
 	/* reset migration state */
 	pscom.migration_state = PSCOM_MIGRATION_INACTIVE;
@@ -200,9 +200,9 @@ void pscom_migration_handle_shutdown_req(void)
 	/* change migration state */
 	pscom.migration_state = PSCOM_MIGRATION_IN_PROGRESS;
 
-	printf(">>> CALLING SHUTDOWN... ###\n");
+	DPRINT(1, "INFO: Handling shutdown request ...\n");
 	pscom_suspend_non_migratable_plugins();
-	printf(">>> SHUTDOWN COMPLETE... ###\n");
+	DPRINT(1, "INFO: Shutdown complete!\n");
 
 	/* inform migration-framework */
 	int err = mosquitto_publish(pscom_mosquitto_client,
