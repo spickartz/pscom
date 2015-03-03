@@ -179,17 +179,21 @@ void pscom_poll_write_start(pscom_con_t *con)
 	/* was there a state change request? */
 	if (pscom.migration_state == PSCOM_MIGRATION_REQ) {
 		pscom_migration_handle_shutdown_req();
+
+	} else {
+		assert(con->pub.type != PSCOM_CON_TYPE_ONDEMAND);
+
+		/* only send if con is not suspended */
+		if(!con->write_is_suspended) {
+			if (list_empty(&con->poll_next_send)) {
+				list_add_tail(&con->poll_next_send, &pscom.poll_sender);
+			}
+			con->do_write(con);
+			/* Dont do anything after this line.
+			   do_write() can reenter pscom_poll_write_start()! */
+		}
 	}
 
-	/* only send if con is not suspended */
-	if(!con->write_is_suspended) {
-		if (list_empty(&con->poll_next_send)) {
-			list_add_tail(&con->poll_next_send, &pscom.poll_sender);
-		}
-		con->do_write(con);
-		/* Dont do anything after this line.
-		   do_write() can reenter pscom_poll_write_start()! */
-	}
 	/* ensure to write on resume of the connection */
 	con->write_is_signaled = 1;
 }
@@ -219,18 +223,21 @@ void pscom_poll_read_start(pscom_con_t *con)
 	/* was there a shutdown request? */
 	if (pscom.migration_state == PSCOM_MIGRATION_REQ) {
 		pscom_migration_handle_shutdown_req();
-	}
 
-	/* only recv if con is not suspended */
-	if(!con->read_is_suspended) {
-		pscom_poll_reader_t *reader = &con->poll_reader;
-		if (list_empty(&reader->next)) {
-			list_add_tail(&reader->next, &pscom.poll_reader);
+	} else {
+		assert(con->pub.type != PSCOM_CON_TYPE_ONDEMAND);
+
+		/* only recv if con is not suspended */
+		if(!con->read_is_suspended) {
+			pscom_poll_reader_t *reader = &con->poll_reader;
+			if (list_empty(&reader->next)) {
+				list_add_tail(&reader->next, &pscom.poll_reader);
+			}
+
+			reader->do_read(reader);
+			/* Dont do anything after this line.
+			   do_read() can reenter pscom_poll_read_start()! */
 		}
-
-		reader->do_read(reader);
-		/* Dont do anything after this line.
-		   do_read() can reenter pscom_poll_read_start()! */
 	}
 
 	/* ensure to recv on resume of the connection */

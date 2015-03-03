@@ -32,7 +32,7 @@ const char *arg_server = "localhost:7100";
 int arg_client = 0;
 int arg_lport = 7100;
 
-int arg_loops = 128; //1024;
+int arg_loops = 1024*1024;
 int arg_maxtime = 3000;
 #define MAX_XHEADER 100
 int arg_xheader = 12;

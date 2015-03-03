@@ -590,7 +590,7 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 	pscom_connection_t *connection = request->connection;
 	pscom_socket_t *socket = connection->socket;
 
-	DPRINT(1, "INFO: >>> SHUTDOWN ACK SENT to '%s'! <<<\n", connection->remote_con_info.name);
+	DPRINT(1, "INFO: >>> SHUTDOWN ACK SENT to %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
 	con->write_suspend(con);
 
 	pscom_request_free(request);
@@ -629,7 +629,7 @@ void pscom_shutdown_req_receiver_io_done(pscom_request_t *request)
 	pscom_connection_t *connection = request->connection;
 	pscom_con_t *con = get_con(connection);
 
-	DPRINT(1, "INFO: >>> SHUTDOWN REQ RECEIVED from '%s'! <<<\n", connection->remote_con_info.name);
+	DPRINT(1, "INFO: >>> SHUTDOWN REQ RECEIVED from %s <<<\n", pscom_con_info_str(&connection->remote_con_info.name));
 
 	con->read_suspend(con);
 
@@ -646,7 +646,7 @@ void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 	pscom_connection_t *connection = request->connection;
 	pscom_socket_t *socket = connection->socket;
 
-	DPRINT(1, ">>> SHUTDOWN ACK RECEIVED from '%s'! <<<\n", connection->remote_con_info.name);
+	DPRINT(1, ">>> SHUTDOWN ACK RECEIVED from %s <<<\n", pscom_con_info_str(&connection->remote_con_info.name));
 	con->read_suspend(con);
 
 	pscom_request_free(request);

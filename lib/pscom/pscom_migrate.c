@@ -77,7 +77,7 @@ int pscom_suspend_plugins(void)
 			
 				/* wait for response */
 				while (con->read_is_suspended == 0) {
-					pscom_poll_read_start(con);
+					con->read_start(con);
 					pscom_test_any();
 				}
 			}
