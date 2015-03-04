@@ -230,6 +230,7 @@ struct PSCOM_socket
 						 pscom_header_net_t *header_net);
 	} ops;
 	int		listen_portno; /* portno or -1 */
+	int		old_listen_portno; /* portno or -1 */
 
 	pscom_con_info_t local_con_info;
 

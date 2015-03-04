@@ -342,6 +342,7 @@ void do_pp_client(pscom_connection_t *con)
 			printf("Error in communication...\n");
 		}
 
+		if(0)
 		{
 			double t = (t2 - t1) / 1000;
 			while (t > arg_maxtime) {

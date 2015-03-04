@@ -55,6 +55,7 @@ void pscom_sock_stop_listen(pscom_sock_t *sock)
 		return;
 
 	pscom_listener_active_dec(&sock->listen);
+	sock->pub.old_listen_portno = sock->pub.listen_portno;
 	sock->pub.listen_portno = -1;
 }
 
@@ -125,6 +126,7 @@ pscom_sock_t *pscom_sock_create(unsigned int userdata_size)
 	sock->pub.ops.default_recv = NULL;
 
 	sock->pub.listen_portno = -1;
+	sock->pub.old_listen_portno = -1;
 	pscom_listener_init(&sock->listen, pscom_con_accept, sock);
 
 	sock->con_type_mask = ~0ULL;

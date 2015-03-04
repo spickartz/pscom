@@ -599,10 +599,22 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 	con->close(con);
 	list_del_init(&con->next);
 
-	strcpy(connection->socket->local_con_info.name, PSCOM_NAME_ACK_SENDER);
+	/* save name and port */
+	int listen_portno = socket->old_listen_portno;
+	int remote_portno = connection->portno;
+
+	if(listen_portno <= 0) {
+		listen_portno = PSCOM_PORT_ACK_SENDER;
+	}
+
+	if(remote_portno <= 0) {
+		remote_portno = PSCOM_PORT_ACK_RECEIVER;
+	}
+
+	memcpy(connection->socket->local_con_info.name, PSCOM_NAME_ACK_SENDER, 8*sizeof(char));
 
 	/* start to listen */
-	if ((rc = pscom_listen(connection->socket, PSCOM_PORT_ACK_SENDER))) {
+	if ((rc = pscom_listen(connection->socket, listen_portno))) {
 		DPRINT(1, "ERROR: Could not start listening - '%s' (%d)\n",
 		       pscom_err_str(rc),
 		       rc);
@@ -610,7 +622,7 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 
 	if ((rc = pscom_connect_ondemand(connection, 
 					 connection->remote_con_info.node_id,
-					 PSCOM_PORT_ACK_RECEIVER,
+					 remote_portno,
 					 PSCOM_NAME_ACK_RECEIVER))) {
 		DPRINT(1,"ERROR: Could not connect - '%s' (%d)\n",
 		       pscom_err_str(rc),
@@ -655,10 +667,22 @@ void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 	con->close(con);
 	list_del_init(&con->next);
 
-	strcpy(connection->socket->local_con_info.name, PSCOM_NAME_ACK_RECEIVER);
+	/* save name and port */
+	int listen_portno = socket->old_listen_portno;
+	int remote_portno = connection->portno;
+
+	if(listen_portno <= 0) {
+		listen_portno = PSCOM_PORT_ACK_RECEIVER;
+	}
+
+	if(remote_portno <= 0) {
+		remote_portno = PSCOM_PORT_ACK_SENDER;
+	}
+
+	memcpy(connection->socket->local_con_info.name, PSCOM_NAME_ACK_RECEIVER, 8*sizeof(char));
 
 	/* start to listen */
-	if ((rc = pscom_listen(connection->socket, PSCOM_PORT_ACK_RECEIVER))) {
+	if ((rc = pscom_listen(connection->socket, listen_portno))) {
 		DPRINT(1, "ERROR: Could not start listening - '%s' (%d)\n",
 		       pscom_err_str(rc),
 		       rc);
@@ -666,7 +690,7 @@ void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 
 	if ((rc = pscom_connect_ondemand(connection, 
 					 connection->remote_con_info.node_id,
-					 PSCOM_PORT_ACK_SENDER,
+					 remote_portno,
 					 PSCOM_NAME_ACK_SENDER))) {
 		DPRINT(1,"ERROR: Could not connect - '%s' (%d)\n",
 		       pscom_err_str(rc),
