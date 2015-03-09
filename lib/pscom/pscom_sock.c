@@ -260,6 +260,8 @@ pscom_err_t pscom_listen(pscom_socket_t *_socket, int portno)
 		DPRINT(PRECON_LL, "precon: listen(%d, %d) on port %u", listen_fd,
 		       pscom.env.tcp_backlog, ntohs(sa.sin_port));
 
+		printf("======================== LISTEN on %d/%d =========================\n", portno, ntohs(sa.sin_port));
+
 		if (fcntl(listen_fd, F_SETFL, O_NONBLOCK) < 0)
 			goto err_nonblock;
 

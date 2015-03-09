@@ -1,4 +1,4 @@
-/*
+a/*
  * ParaStation
  *
  * Copyright (C) 2004 ParTec AG, Karlsruhe

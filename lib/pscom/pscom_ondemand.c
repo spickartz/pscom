@@ -19,6 +19,20 @@ static
 void pscom_ondemand_read_stop(pscom_con_t *con);
 
 
+int pscom_print_names(const char name1[8], const char name2[8])
+{
+	char a[9], b[9];
+
+	memset(a, 0, 9);
+	memset(b, 0, 9);
+	memcpy(a, name1, 8);
+	memcpy(b, name2, 8);
+
+	printf("### %s vs. %s ###\n", a, b);
+
+	return 0;
+}
+
 static
 int pscom_name_is_equal(const char name1[8], const char name2[8])
 {
@@ -75,11 +89,15 @@ static
 void pscom_ondemand_write_start(pscom_con_t *con)
 {
 	if(!con->write_is_suspended) {
+		pscom_print_names(con->arch.ondemand.name, con->pub.socket->local_con_info.name);
 		if (pscom_name_is_lower(con->arch.ondemand.name, con->pub.socket->local_con_info.name)) {
+			printf("TRY TO CONNECT: !IN!DIRECT %s | %d\n", pscom_con_info_str(&con->pub.remote_con_info), con->arch.ondemand.portno);
 			pscom_ondemand_read_start(con); // be prepared for the back connect
 			pscom_ondemand_indirect_connect(con);
 		} else {
 			pscom_sock_t *sock = get_sock(con->pub.socket);
+
+			printf("TRY TO CONNECT: DIRECT %s | %d\n", pscom_con_info_str(&con->pub.remote_con_info), con->arch.ondemand.portno);
 
 			pscom_listener_user_inc(&sock->listen); // listen until we have the connection
 
