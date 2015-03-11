@@ -61,6 +61,7 @@ void pscom_listener_user_dec(struct pscom_listener *listener)
 		int fd = pscom_listener_get_fd(listener);
 		if (fd >= 0) {
 			printf("======================== CLOSE =========================\n");
+			assert(0);
 			close(fd);
 		} else {
 			DPRINT(1, "warning: %s() fd already closed", __func__);
@@ -94,4 +95,15 @@ void pscom_listener_active_dec(struct pscom_listener *listener)
 
 		pscom_listener_user_dec(listener);
 	}
+}
+
+void pscom_listener_suspend(struct pscom_listener *listener)
+{
+	ufd_del(&pscom.ufd, &listener->ufd_info);
+}
+
+void pscom_listener_resume(struct pscom_listener *listener)
+{
+	ufd_add(&pscom.ufd, &listener->ufd_info);
+	ufd_event_set(&pscom.ufd, &listener->ufd_info, POLLIN);
 }

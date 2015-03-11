@@ -230,7 +230,6 @@ struct PSCOM_socket
 						 pscom_header_net_t *header_net);
 	} ops;
 	int		listen_portno; /* portno or -1 */
-	int		old_listen_portno; /* portno or -1 */
 
 	pscom_con_info_t local_con_info;
 
@@ -320,6 +319,8 @@ pscom_err_t pscom_listen(pscom_socket_t *socket, int portno);
  *
  */
 void pscom_stop_listen(pscom_socket_t *socket);
+void pscom_suspend_listen(pscom_socket_t *socket);
+void pscom_resume_listen(pscom_socket_t *socket);
 
 /* Flush the sendqueue */
 void pscom_flush(pscom_connection_t *connection);

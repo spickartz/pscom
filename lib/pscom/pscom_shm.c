@@ -556,7 +556,7 @@ void shm_close(pscom_con_t *con)
 		assert(list_empty(&con->poll_next_send));
 		assert(list_empty(&con->poll_reader.next));
 
-		DPRINT(1, "INFO: >>> SHM PLUGIN CLOSED! <<<");
+		DPRINT(1, "INFO: >>> SHM CONNECTION CLOSED! <<<");
 	}
 }
 
@@ -662,6 +662,11 @@ error_initsend:
 }
 
 
+void pscom_shm_destroy(void)
+{
+	DPRINT(1, "INFO: >>> SHM PLUGIN DESTROYED! <<<");
+}
+
 pscom_plugin_t pscom_plugin_shm = {
 	.name		= "shm",
 	.version	= PSCOM_PLUGIN_VERSION,
@@ -669,7 +674,7 @@ pscom_plugin_t pscom_plugin_shm = {
 	.priority	= PSCOM_SHM_PRIO,
 	.properties     = PSCOM_PLUGIN_PROP_NOT_MIGRATABLE,
 	.init		= NULL,
-	.destroy	= NULL,
+	.destroy	= pscom_shm_destroy,
 	.sock_init	= pscom_shm_sock_init,
 	.sock_destroy	= NULL,
 	.con_init	= pscom_shm_con_init,

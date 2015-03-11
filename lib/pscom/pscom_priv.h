@@ -595,6 +595,9 @@ void pscom_listener_user_dec(struct pscom_listener *listener);
 void pscom_listener_active_inc(struct pscom_listener *listener);
 void pscom_listener_active_dec(struct pscom_listener *listener);
 
+void pscom_listener_suspend(struct pscom_listener *listener);
+void pscom_listener_resume(struct pscom_listener *listener);
+
 const char *pscom_con_str_reverse(pscom_connection_t *connection);
 
 #endif /* _PSCOM_PRIV_H_ */

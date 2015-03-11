@@ -20,9 +20,7 @@
 #include "pscom_str_util.h"
 #include "pscom_util.h"
 
-#define PSCOM_PORT_FALL_BACK           5046
-// This fall-back just works with up to one unknown port/process per host!
-
+#undef  PSCOM_ENFORCE_MIGRANT_CONNECT
 #define PSCOM_NAME_ACK_SENDER          "server__"
 #define PSCOM_NAME_ACK_RECEIVER        "client__"
 
@@ -598,17 +596,8 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 
 	/* save name and port */
 	int node_id = connection->remote_con_info.node_id;
-	int listen_portno = socket->old_listen_portno;
 	int remote_portno = connection->portno;
 	char remote_name[8];
-
-	if(listen_portno <= 0) {
-		listen_portno = PSCOM_PORT_FALL_BACK;
-	}
-
-	if(remote_portno <= 0) {
-		remote_portno = PSCOM_PORT_FALL_BACK;
-	}
 
 #ifdef PSCOM_ENFORCE_MIGRANT_CONNECT
 	memcpy(remote_name, PSCOM_NAME_ACK_SENDER, 8);
@@ -620,13 +609,7 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 	con->close(con);
 	list_del_init(&con->next);
 
-	/* start to listen */
-	if ((rc = pscom_listen(connection->socket, listen_portno))) {
-		DPRINT(1, "ERROR: Could not start listening - '%s' (%d)\n",
-		       pscom_err_str(rc),
-		       rc);
-	}
-
+	/* re-create on-demand connection: */
 	if ((rc = pscom_connect_ondemand(connection, 
 					 node_id,
 					 remote_portno,
@@ -639,7 +622,6 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 	}
 
 	pscom_con_resume(con);
-	pscom_stop_listen(socket);
 }
 
 static
@@ -666,24 +648,15 @@ void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 	pscom_connection_t *connection = request->connection;
 	pscom_socket_t *socket = connection->socket;
 
-	DPRINT(1, ">>> SHUTDOWN ACK RECEIVED from %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
+	DPRINT(1, "INFO: >>> SHUTDOWN ACK RECEIVED from %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
 	con->read_suspend(con);
 
 	pscom_request_free(request);
 
 	/* save name and port */
 	int node_id = connection->remote_con_info.node_id;
-	int listen_portno = socket->old_listen_portno;
 	int remote_portno = connection->portno;
 	char remote_name[8];
-
-	if(listen_portno <= 0) {
-		listen_portno = PSCOM_PORT_FALL_BACK;
-	}
-
-	if(remote_portno <= 0) {
-		remote_portno = PSCOM_PORT_FALL_BACK;
-	}
 
 #ifdef PSCOM_ENFORCE_MIGRANT_CONNECT
 	memcpy(remote_name, PSCOM_NAME_ACK_RECEIVER, 8);
@@ -695,14 +668,7 @@ void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 	con->close(con);
 	list_del_init(&con->next);
 
-
-	/* start to listen */
-	if ((rc = pscom_listen(connection->socket, listen_portno))) {
-		DPRINT(1, "ERROR: Could not start listening - '%s' (%d)\n",
-		       pscom_err_str(rc),
-		       rc);
-	}
-
+	/* re-create on-demand connection: */
 	if ((rc = pscom_connect_ondemand(connection,
 					 node_id,
 					 remote_portno,
@@ -712,9 +678,6 @@ void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 		       rc);
 		exit(-1);
 	}
-
-	/* stop listening */
-	pscom_stop_listen(socket);
 }
 
 

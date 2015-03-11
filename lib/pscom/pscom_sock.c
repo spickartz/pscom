@@ -55,10 +55,22 @@ void pscom_sock_stop_listen(pscom_sock_t *sock)
 		return;
 
 	pscom_listener_active_dec(&sock->listen);
-	sock->pub.old_listen_portno = sock->pub.listen_portno;
-	sock->pub.listen_portno = -1;
+
+	if(pscom_listener_get_fd(&sock->listen) == -1)
+		sock->pub.listen_portno = -1;
 }
 
+static
+void pscom_sock_suspend_listen(pscom_sock_t *sock)
+{
+	pscom_listener_suspend(&sock->listen);
+}
+
+static
+void pscom_sock_resume_listen(pscom_sock_t *sock)
+{
+	pscom_listener_resume(&sock->listen);
+}
 
 static
 void pscom_sock_close(pscom_sock_t *sock)
@@ -126,7 +138,6 @@ pscom_sock_t *pscom_sock_create(unsigned int userdata_size)
 	sock->pub.ops.default_recv = NULL;
 
 	sock->pub.listen_portno = -1;
-	sock->pub.old_listen_portno = -1;
 	pscom_listener_init(&sock->listen, pscom_con_accept, sock);
 
 	sock->con_type_mask = ~0ULL;
@@ -296,6 +307,10 @@ pscom_err_t pscom_listen(pscom_socket_t *_socket, int portno)
 		err_already_listening:
 			ret = PSCOM_ERR_ALREADY;
 		}
+
+		/* Ensure that we are always listening! (only needed for migration) */
+		pscom_listener_user_inc(&sock->listen);
+
 	} pscom_unlock();
 
 	return ret;
@@ -322,6 +337,21 @@ void pscom_stop_listen(pscom_socket_t *socket)
 	} pscom_unlock();
 }
 
+void pscom_suspend_listen(pscom_socket_t *socket)
+{
+	pscom_lock(); {
+		pscom_sock_t *sock = get_sock(socket);
+		pscom_sock_suspend_listen(sock);
+	} pscom_unlock();
+}
+
+void pscom_resume_listen(pscom_socket_t *socket)
+{
+	pscom_lock(); {
+		pscom_sock_t *sock = get_sock(socket);
+		pscom_sock_resume_listen(sock);
+	} pscom_unlock();
+}
 
 void pscom_con_type_mask_all(pscom_socket_t *socket)
 {

@@ -48,14 +48,18 @@ int pscom_suspend_plugins(void)
 
 	/*
 	 * Shutdown connections first
-	 */	
+	 */
 
 	/* iterate over all sockets */
 	list_for_each(pos_sock, &pscom.sockets) {
 		pscom_sock_t *sock = list_entry(pos_sock, pscom_sock_t, next);
 
+		/* suspend listen FD: */
+		pscom_suspend_listen(&sock->pub);
+
 		/* iterate over all connections */
-		list_for_each(pos_con, &sock->connections) {
+		struct list_head *tmp_con;
+		list_for_each_safe(pos_con, tmp_con, &sock->connections) {
 			pscom_con_t *con = list_entry(pos_con,
 			    			      pscom_con_t, 
 						      next);
@@ -64,6 +68,12 @@ int pscom_suspend_plugins(void)
 			arch = PSCOM_CON_TYPE2ARCH(con->pub.type);
 		 	plugin = pscom_plugin_by_archid(arch);
 
+			/* suspend all still pending on-demand connections, too */
+			if(con->pub.type == PSCOM_CON_TYPE_ONDEMAND) {
+				con->read_suspend(con);
+				con->write_suspend(con);
+			}
+
 			/* go to next connection if plugin not set */
 			if (plugin == NULL)
 				continue;
@@ -71,10 +81,9 @@ int pscom_suspend_plugins(void)
 			/* shutdown the connection if not migratable */
 			if (plugin->properties & 
 			    PSCOM_PLUGIN_PROP_NOT_MIGRATABLE) {
-			
+
 				pscom_con_shutdown(con);	
 
-			
 				/* wait for response */
 				while (con->read_is_suspended == 0) {
 					con->read_start(con);
@@ -99,7 +108,7 @@ int pscom_suspend_plugins(void)
 			       __FILE__, 
 			       __LINE__,
 			       plugin->name);
-			//plugin->destroy();
+			plugin->destroy();
 			DPRINT(1, 
 			       "%s %u: Successfully destroyed '%s'!", 
 			       __FILE__, 
@@ -134,12 +143,14 @@ int pscom_resume_plugins(void)
 	list_for_each(pos_sock, &pscom.sockets) {
 		pscom_sock_t *sock = list_entry(pos_sock, pscom_sock_t, next);
 
+		/* resume listen FD: */
+		pscom_resume_listen(&sock->pub);
+
 		/* iterate over all connections */
 		list_for_each(pos_con, &sock->connections) {
 			pscom_con_t *con = list_entry(pos_con,
 			    			      pscom_con_t, 
 						      next);
-	
 			/* resume connections */
 			pscom_resume_connection(&con->pub);	
 		}
