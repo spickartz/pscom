@@ -621,6 +621,8 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 		exit(-1);
 	}
 
+	assert(pscom.migration_state == PSCOM_MIGRATION_INACTIVE);
+
 	pscom_con_resume(con);
 }
 
@@ -691,9 +693,10 @@ pscom_req_t *pscom_get_shutdown_receiver(pscom_con_t *con, pscom_header_net_t *n
 	pscom_shutdown_msg_t *shutdown_msg = (pscom_shutdown_msg_t *) req->pub.user;
 
 	if(nh->msg_type == PSCOM_MSGTYPE_SHUTDOWN_REQ) {
-
+		assert(pscom.migration_state == PSCOM_MIGRATION_INACTIVE);
 		req->pub.ops.io_done = pscom_shutdown_req_receiver_io_done;
 	} else {
+		assert(pscom.migration_state == PSCOM_MIGRATION_PREPARING);
 		req->pub.ops.io_done = pscom_shutdown_ack_receiver_io_done;
 	}
 

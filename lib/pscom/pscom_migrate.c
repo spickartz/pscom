@@ -173,25 +173,47 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
     				 void *arg, 
 				 const struct mosquitto_message *message)
 {
-	char my_pid[10];
-	sprintf(my_pid, "%d", getpid());
+	int my_pid, pid1, pid2;
 
-	DPRINT(1, "\nINFO: Got MQTT message: %s (vs %s = my pid)\n", (char*)message->payload, my_pid);
+	my_pid = getpid();
 
-	if(strncmp((char*)message->payload, my_pid, 10)==0) {
+#if 0
+	sscanf((char*)message->payload, "%d", &pid);
+		
+	DPRINT(1, "\nINFO: Got MQTT message: %s (%d vs %d = my pid)\n", (char*)message->payload, pid, my_pid);
+
+	if(pid == my_pid){
+#else
+	sscanf((char*)message->payload, "%d %d", &pid1, &pid2);
+		
+	DPRINT(1, "\nINFO: Got MQTT message: %s (%d|%d vs %d = my pid)\n", (char*)message->payload, pid1, pid2, my_pid);
+
+	if((pid1 == my_pid) || (pid2 == my_pid)) {
+#endif
 
 		if (pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
-			pscom.migration_state = PSCOM_MIGRATION_REQ;
-			DPRINT(2, "\nSTATE: PSCOM_MIGRATION_INACTIVE -> PSCOM_MIGRATION_REQ");
-		} else if (pscom.migration_state == PSCOM_MIGRATION_IN_PROGRESS) {
-			pscom.migration_state = PSCOM_MIGRATION_DONE;
-			DPRINT(2, "STATE: PSCOM_MIGRATION_IN_PROGRESS -> PSCOM_MIGRATION_DONE");
-		} else if (pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
-			DPRINT(2, "STATE: PSCOM_MIGRATION_INACTIVE");
-		} else if (pscom.migration_state == PSCOM_MIGRATION_DONE) {
-			DPRINT(2, "STATE: PSCOM_MIGRATION_DONE");
+
+			pscom.migration_state = PSCOM_MIGRATION_REQUESTED;
+			DPRINT(2, "\nSTATE: PSCOM_MIGRATION_INACTIVE -> PSCOM_MIGRATION_REQUESTED");
+
+		} else if (pscom.migration_state == PSCOM_MIGRATION_ALLOWED) {
+
+			pscom.migration_state = PSCOM_MIGRATION_FINISHED;
+			DPRINT(2, "STATE: PSCOM_MIGRATION_ALLOWED -> PSCOM_MIGRATION_FINISHED");
+
+		} else if (pscom.migration_state == PSCOM_MIGRATION_REQUESTED) {
+			DPRINT(2, "STATE: PSCOM_MIGRATION_REQUESTED");
+			assert(0);
+		} else if (pscom.migration_state == PSCOM_MIGRATION_PREPARING) {
+			DPRINT(2, "STATE: PSCOM_MIGRATION_PREPARING");
+			assert(0);
+
+		} else if (pscom.migration_state == PSCOM_MIGRATION_FINISHED) {
+			DPRINT(2, "STATE: PSCOM_MIGRATION_FINISHED");
+			assert(0);
 		} else {
 			DPRINT(2, "STATE: !UNKNOWN!");
+			assert(0);
 		}
 	}
 }
@@ -209,11 +231,14 @@ void pscom_migration_handle_resume_req(void)
 void pscom_migration_handle_shutdown_req(void)
 {
 	/* change migration state */
-	pscom.migration_state = PSCOM_MIGRATION_IN_PROGRESS;
+	pscom.migration_state = PSCOM_MIGRATION_PREPARING;
 
 	DPRINT(1, "INFO: Handling shutdown request ...\n");
 	pscom_suspend_non_migratable_plugins();
 	DPRINT(1, "INFO: Shutdown complete!\n");
+
+	/* change migration state */
+	pscom.migration_state = PSCOM_MIGRATION_ALLOWED;
 
 	/* inform migration-framework */
 	int err = mosquitto_publish(pscom_mosquitto_client,
@@ -234,7 +259,7 @@ void pscom_migration_handle_shutdown_req(void)
 	}
 
 	/* wait until the migration has terminated */
-	while (pscom.migration_state != PSCOM_MIGRATION_DONE) {
+	while (pscom.migration_state != PSCOM_MIGRATION_FINISHED) {
 		sched_yield();
 	}
 
