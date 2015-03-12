@@ -649,9 +649,9 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 
 	pscom_reset_con_to_ondemand(con);
 
-	assert(pscom.migration_state == PSCOM_MIGRATION_INACTIVE);
-
-	pscom_con_resume(con);
+	if(pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
+		pscom_con_resume(con);
+	}
 }
 
 static
@@ -693,7 +693,6 @@ void pscom_shutdown_req_receiver_io_done(pscom_request_t *request)
 		pscom_reset_con_to_ondemand(con);
 
 	} else {
-		assert(pscom.migration_state == PSCOM_MIGRATION_INACTIVE || pscom.migration_state == PSCOM_MIGRATION_REQUESTED);
 
 		con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_RECEIVED;
 
