@@ -338,6 +338,7 @@ struct PSCOM_sock
 		unsigned	usercnt;	// Count the users of the listening fd. (keep fd open, if > 0)
 						// (pscom_listen and "on demand" connections)
 		unsigned	activecnt;	// Count active listeners. (poll on fd, if > 0)
+		unsigned	is_suspended;	// Flag indicating that listener is temporarily suspended
 	} listen;
 
 	unsigned int		recv_req_cnt_any; // count all ANY_SOURCE receive requests on this socket

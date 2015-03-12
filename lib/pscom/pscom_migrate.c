@@ -173,17 +173,19 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
     				 void *arg, 
 				 const struct mosquitto_message *message)
 {
-	int my_pid, pid1, pid2;
+	int my_pid;
 
 	my_pid = getpid();
 
-#if 0
+#if 1
+	int pid;
 	sscanf((char*)message->payload, "%d", &pid);
 		
 	DPRINT(1, "\nINFO: Got MQTT message: %s (%d vs %d = my pid)\n", (char*)message->payload, pid, my_pid);
 
 	if(pid == my_pid){
 #else
+		int pid1, pid2;
 	sscanf((char*)message->payload, "%d %d", &pid1, &pid2);
 		
 	DPRINT(1, "\nINFO: Got MQTT message: %s (%d|%d vs %d = my pid)\n", (char*)message->payload, pid1, pid2, my_pid);
