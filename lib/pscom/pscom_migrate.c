@@ -180,14 +180,14 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 #if 1
 	int pid;
 	sscanf((char*)message->payload, "%d", &pid);
-		
+
 	DPRINT(1, "\nINFO: Got MQTT message: %s (%d vs %d = my pid)\n", (char*)message->payload, pid, my_pid);
 
 	if(pid == my_pid){
 #else
 		int pid1, pid2;
 	sscanf((char*)message->payload, "%d %d", &pid1, &pid2);
-		
+
 	DPRINT(1, "\nINFO: Got MQTT message: %s (%d|%d vs %d = my pid)\n", (char*)message->payload, pid1, pid2, my_pid);
 
 	if((pid1 == my_pid) || (pid2 == my_pid)) {
@@ -241,6 +241,8 @@ void pscom_migration_handle_shutdown_req(void)
 
 	/* change migration state */
 	pscom.migration_state = PSCOM_MIGRATION_ALLOWED;
+
+	DPRINT(3, "!!!!!!!!!!!!!!! MIGRATON ALLOWED !!!!!!!!!!!!!!!");
 
 	/* inform migration-framework */
 	int err = mosquitto_publish(pscom_mosquitto_client,
