@@ -68,21 +68,6 @@ void                       pscom_read_get_buf(pscom_con_t *con, char **buf, size
 void                       pscom_read_done(pscom_con_t *con, char *buf, size_t len);
 
 
-void pscom_post_shutdown_msg(pscom_con_t *con)
-{
-	pscom_req_t * req;
-
-	/* prepare and send SHUTDOWN_REQ */
-	req = pscom_req_create(0, sizeof(pscom_shutdown_msg_t));
-	req->pub.connection = &con->pub;
-	pscom_post_send_direct(req, PSCOM_MSGTYPE_SHUTDOWN_REQ);
-
-	/* wait for request to be processed */
-	pscom_wait(&req->pub);
-	pscom_req_free(req);
-}
-
-
 void pscom_req_prepare_recv(pscom_req_t *req, const pscom_header_net_t *nh, pscom_connection_t *connection)
 {
 	unsigned int copy_header = sizeof(req->pub.header) +
@@ -581,6 +566,35 @@ pscom_req_t *_pscom_get_rendezvous_fin_receiver(pscom_con_t *con, pscom_header_n
 	return NULL;
 }
 
+
+static
+void pscom_shutdown_req_sender_io_done(pscom_request_t *request)
+{
+	pscom_con_t *con = get_con(request->connection);
+
+	con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_SENT,
+
+	/* hold back all further send requests */
+	con->write_suspend(con);
+}
+
+void pscom_post_shutdown_msg(pscom_con_t *con)
+{
+	pscom_req_t * req;
+
+	/* prepare and send SHUTDOWN_REQ */
+	req = pscom_req_create(0, sizeof(pscom_shutdown_msg_t));
+	req->pub.connection = &con->pub;
+	req->pub.ops.io_done = pscom_shutdown_req_sender_io_done;
+
+	con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_POSTED,
+	pscom_post_send_direct(req, PSCOM_MSGTYPE_SHUTDOWN_REQ);
+
+	/* wait for request to be processed */
+	pscom_wait(&req->pub);
+	pscom_req_free(req);
+}
+
 static
 void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 {
@@ -588,6 +602,8 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 	pscom_con_t *con = get_con(request->connection);
 	pscom_connection_t *connection = request->connection;
 	pscom_socket_t *socket = connection->socket;
+
+	con->shutdown_ack_status = PSCOM_SHUTDOWN_ACK_SENT;
 
 	DPRINT(1, "INFO: >>> SHUTDOWN ACK SENT to %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
 	con->write_suspend(con);
@@ -633,12 +649,15 @@ void pscom_shutdown_req_receiver_io_done(pscom_request_t *request)
 	pscom_connection_t *connection = request->connection;
 	pscom_con_t *con = get_con(connection);
 
+	con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_RECEIVED;
+
 	DPRINT(1, "INFO: >>> SHUTDOWN REQ RECEIVED from %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
 
 	con->read_suspend(con);
 
 	req->pub.ops.io_done = pscom_shutdown_ack_sender_io_done;
 
+	con->shutdown_ack_status = PSCOM_SHUTDOWN_ACK_POSTED,
 	pscom_post_send_direct(req, PSCOM_MSGTYPE_SHUTDOWN_ACK);
 }
 
@@ -649,6 +668,8 @@ void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 	pscom_con_t *con = get_con(request->connection);
 	pscom_connection_t *connection = request->connection;
 	pscom_socket_t *socket = connection->socket;
+
+	con->shutdown_req_status = PSCOM_SHUTDOWN_ACK_RECEIVED;
 
 	DPRINT(1, "INFO: >>> SHUTDOWN ACK RECEIVED from %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
 	con->read_suspend(con);

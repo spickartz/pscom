@@ -249,6 +249,9 @@ struct PSCOM_con
 	int read_is_suspended;
 	int read_is_signaled;
 
+	int shutdown_req_status;
+	int shutdown_ack_status;
+
 	/* RMA functions: */
 	/* register mem region for RMA. should return size of
 	 * rd->msg.arch.xxx (this is used, to calculate the size of
@@ -361,6 +364,7 @@ struct PSCOM_sock
 	pscom_socket_t		pub;
 };
 
+
 typedef enum PSCOM_Migration_state {
 	PSCOM_MIGRATION_INACTIVE=0,
 	PSCOM_MIGRATION_REQUESTED,
@@ -368,6 +372,17 @@ typedef enum PSCOM_Migration_state {
 	PSCOM_MIGRATION_ALLOWED,
 	PSCOM_MIGRATION_FINISHED,
 } pscom_migration_state_t;
+
+typedef enum PSCOM_Shutdown_state {
+	PSCOM_SHUTDOWN_INACTIVE=0,
+	PSCOM_SHUTDOWN_REQ_POSTED,
+	PSCOM_SHUTDOWN_REQ_SENT,
+	PSCOM_SHUTDOWN_REQ_RECEIVED,
+	PSCOM_SHUTDOWN_ACK_POSTED,
+	PSCOM_SHUTDOWN_ACK_SENT,
+	PSCOM_SHUTDOWN_ACK_RECEIVED,
+} pscom_shutdown_state_t;
+
 
 struct PSCOM
 {

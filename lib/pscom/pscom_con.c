@@ -283,9 +283,6 @@ void pscom_con_shutdown(pscom_con_t *con)
 	pscom_post_shutdown_msg(con);
 
 	DPRINT(1, "INFO: >>> CONNECTION SHUTDOWN REQ SENT to %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
-
-	/* hold back all further send requests */
-	con->write_suspend(con);
 }
 
 void pscom_con_resume(pscom_con_t *con)
@@ -389,6 +386,9 @@ pscom_con_t *pscom_con_create(pscom_sock_t *sock)
 	con->read_resume = pscom_poll_read_resume;
 	con->read_is_suspended = 0;
 	con->read_is_signaled = 0;
+
+	con->shutdown_req_status = PSCOM_SHUTDOWN_INACTIVE;
+	con->shutdown_ack_status = PSCOM_SHUTDOWN_INACTIVE;
 
 	/* RMA */
 	con->rma_mem_register = NULL;
