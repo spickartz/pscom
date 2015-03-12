@@ -30,7 +30,7 @@
 #define PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH 	50	
 #define PSCOM_MOSQUITTO_TOPIC_LENGTH 		50	
 #define PSCOM_MOSQUITTO_TOPIC 			"_migration_req"
-#define PSCOM_MOSQUITTO_RESP_TOPIC 		"migration_resp"
+#define PSCOM_MOSQUITTO_RESP_TOPIC 		"_migration_resp"
 #define PSCOM_BROKER_HOST 			"localhost"
 #define PSCOM_BROKER_PORT 			1883
 #define PSCOM_KEEP_ALIVE_INT 			60
@@ -173,27 +173,25 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
     				 void *arg, 
 				 const struct mosquitto_message *message)
 {
-	int my_pid;
+	int my_pid, pid;
+	char* msg;
+	char payload[PSCOM_MOSQUITTO_TOPIC_LENGTH];
+
+	strcpy(payload, (char*)message->payload);
 
 	my_pid = getpid();
 
-#if 0
-	int pid;
-	sscanf((char*)message->payload, "%d", &pid);
+	msg = strtok(payload, " ");
 
-	DPRINT(1, "\nINFO: Got MQTT message: %s (%d vs %d = my pid)\n", (char*)message->payload, pid, my_pid);
+	while(msg) {
+		sscanf(msg, "%d", &pid);
+		if(pid == my_pid) break;
+		msg = strtok(NULL, " ");
+	}
 
-	if(pid == my_pid){
-#else
-		int pid1, pid2;
-	sscanf((char*)message->payload, "%d %d", &pid1, &pid2);
+	if(my_pid == pid) {
 
-	DPRINT(1, "\nINFO: Got MQTT message: %s (%d|%d vs %d = my pid)\n", (char*)message->payload, pid1, pid2, my_pid);
-
-	if(my_pid%2 == 0) usleep(100);
-
-	if((pid1 == my_pid) || (pid2 == my_pid)) {
-#endif
+		DPRINT(1, "\nINFO: Got MQTT message: %s (Found my PID %d)\n", (char*)message->payload, my_pid);
 
 		if (pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
 
@@ -205,20 +203,19 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 			pscom.migration_state = PSCOM_MIGRATION_FINISHED;
 			DPRINT(2, "STATE: PSCOM_MIGRATION_ALLOWED -> PSCOM_MIGRATION_FINISHED");
 
-		} else if (pscom.migration_state == PSCOM_MIGRATION_REQUESTED) {
-			DPRINT(2, "STATE: PSCOM_MIGRATION_REQUESTED");
-			assert(0);
 		} else if (pscom.migration_state == PSCOM_MIGRATION_PREPARING) {
-			DPRINT(2, "STATE: PSCOM_MIGRATION_PREPARING");
-			assert(0);
-
+			DPRINT(2, "STATE: PSCOM_MIGRATION_PREPARING -> !WARNING! Didn't change state!");
+			//assert(0);
 		} else if (pscom.migration_state == PSCOM_MIGRATION_FINISHED) {
-			DPRINT(2, "STATE: PSCOM_MIGRATION_FINISHED");
-			assert(0);
+			DPRINT(2, "STATE: PSCOM_MIGRATION_FINISHED -> !WARNING! Didn't change state!");
+			//assert(0);
 		} else {
 			DPRINT(2, "STATE: !UNKNOWN!");
 			assert(0);
 		}
+	}
+	else {
+			DPRINT(1, "\nINFO: Got MQTT message: %s (Didn't find my PID %d)\n", (char*)message->payload, my_pid);
 	}
 }
 
@@ -232,6 +229,30 @@ void pscom_migration_handle_resume_req(void)
 	pscom.migration_state = PSCOM_MIGRATION_INACTIVE;
 
 	DPRINT(3, "[%d] ||||||||||||||| MIGRATON COMPLETED ||||||||||||||", getpid());
+
+	char topic[PSCOM_MOSQUITTO_TOPIC_LENGTH];
+	char state[] = "65536 : COMPLETED";
+	gethostname(topic, PSCOM_MOSQUITTO_TOPIC_LENGTH);
+	strcat(topic, PSCOM_MOSQUITTO_RESP_TOPIC);
+	sprintf(state, "%d : COMPLETED", getpid());
+
+	/* inform migration-framework */
+	int err = mosquitto_publish(pscom_mosquitto_client,
+				    NULL,
+				    topic,
+				    sizeof(state),
+				    (const void*)state,
+				    0,
+				    false);
+	if (err != MOSQ_ERR_SUCCESS) {
+		fprintf(stderr, "ERROR: Could not publish on '%s' - %d"
+		       "(%d [%s])",
+		       PSCOM_MOSQUITTO_RESP_TOPIC,
+		       err,
+		       errno,
+		       strerror(errno));
+		exit(-1);
+	}
 }
 
 void pscom_migration_handle_shutdown_req(void)
@@ -248,12 +269,18 @@ void pscom_migration_handle_shutdown_req(void)
 
 	DPRINT(3, "[%d] !!!!!!!!!!!!!!! MIGRATON ALLOWED !!!!!!!!!!!!!!!", getpid());
 
+	char topic[PSCOM_MOSQUITTO_TOPIC_LENGTH];
+	char state[] = "65536 : ALLOWED";
+	gethostname(topic, PSCOM_MOSQUITTO_TOPIC_LENGTH);
+	strcat(topic, PSCOM_MOSQUITTO_RESP_TOPIC);
+	sprintf(state, "%d : ALLOWED", getpid());
+
 	/* inform migration-framework */
 	int err = mosquitto_publish(pscom_mosquitto_client,
 	    			    NULL,
-				    PSCOM_MOSQUITTO_RESP_TOPIC,
-				    sizeof(pscom.migration_state), 
-				    (const void*)&pscom.migration_state,
+				    topic,
+				    sizeof(state),
+				    (const void*)state,
 				    0,
 				    false);
 	if (err != MOSQ_ERR_SUCCESS) {
