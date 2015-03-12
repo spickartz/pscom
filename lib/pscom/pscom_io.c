@@ -20,10 +20,6 @@
 #include "pscom_str_util.h"
 #include "pscom_util.h"
 
-#undef  PSCOM_ENFORCE_MIGRANT_CONNECT
-#define PSCOM_NAME_ACK_SENDER          "server__"
-#define PSCOM_NAME_ACK_RECEIVER        "client__"
-
 static inline unsigned int header_length(pscom_header_net_t *header);
 static inline int          header_complete(void *buf, unsigned int size);
 static inline int          is_recv_req_done(pscom_req_t *req);
@@ -596,30 +592,18 @@ void pscom_post_shutdown_msg(pscom_con_t *con)
 }
 
 static
-void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
+void pscom_reset_con_to_ondemand(pscom_con_t *con)
 {
 	pscom_err_t rc;
-	pscom_con_t *con = get_con(request->connection);
-	pscom_connection_t *connection = request->connection;
-	pscom_socket_t *socket = connection->socket;
-
-	con->shutdown_ack_status = PSCOM_SHUTDOWN_ACK_SENT;
-
-	DPRINT(1, "INFO: >>> SHUTDOWN ACK SENT to %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
-	con->write_suspend(con);
-
-	pscom_request_free(request);
+	pscom_connection_t *connection = &con->pub;
 
 	/* save name and port */
 	int node_id = connection->remote_con_info.node_id;
 	int remote_portno = connection->portno;
 	char remote_name[8];
 
-#ifdef PSCOM_ENFORCE_MIGRANT_CONNECT
-	memcpy(remote_name, PSCOM_NAME_ACK_SENDER, 8);
-#else
+
 	memcpy(remote_name, connection->remote_con_info.name, 8);
-#endif
 
 	/* close the connection */
 	con->close(con);
@@ -636,6 +620,23 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 		       rc);
 		exit(-1);
 	}
+}
+
+static
+void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
+{
+	pscom_con_t *con = get_con(request->connection);
+	pscom_connection_t *connection = request->connection;
+	pscom_socket_t *socket = connection->socket;
+
+	con->shutdown_ack_status = PSCOM_SHUTDOWN_ACK_SENT;
+
+	DPRINT(1, "INFO: >>> SHUTDOWN ACK SENT to %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
+	con->write_suspend(con);
+
+	pscom_request_free(request);
+
+	pscom_reset_con_to_ondemand(con);
 
 	assert(pscom.migration_state == PSCOM_MIGRATION_INACTIVE);
 
@@ -664,7 +665,6 @@ void pscom_shutdown_req_receiver_io_done(pscom_request_t *request)
 static
 void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 {
-	pscom_err_t rc;
 	pscom_con_t *con = get_con(request->connection);
 	pscom_connection_t *connection = request->connection;
 	pscom_socket_t *socket = connection->socket;
@@ -676,31 +676,7 @@ void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
 
 	pscom_request_free(request);
 
-	/* save name and port */
-	int node_id = connection->remote_con_info.node_id;
-	int remote_portno = connection->portno;
-	char remote_name[8];
-
-#ifdef PSCOM_ENFORCE_MIGRANT_CONNECT
-	memcpy(remote_name, PSCOM_NAME_ACK_RECEIVER, 8);
-#else
-	memcpy(remote_name, connection->remote_con_info.name, 8);
-#endif
-
-	/* close the connection */
-	con->close(con);
-	list_del_init(&con->next);
-
-	/* re-create on-demand connection: */
-	if ((rc = pscom_connect_ondemand(connection,
-					 node_id,
-					 remote_portno,
-					 remote_name))) {
-		DPRINT(1,"ERROR: Could not connect - '%s' (%d)\n",
-		       pscom_err_str(rc),
-		       rc);
-		exit(-1);
-	}
+	pscom_reset_con_to_ondemand(con);
 }
 
 
