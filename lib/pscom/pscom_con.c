@@ -281,8 +281,6 @@ void pscom_con_shutdown(pscom_con_t *con)
 	/* Send SHUTDOWN message */
 
 	pscom_post_shutdown_msg(con);
-
-	DPRINT(1, "INFO: >>> CONNECTION SHUTDOWN REQ SENT to %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
 }
 
 void pscom_con_resume(pscom_con_t *con)

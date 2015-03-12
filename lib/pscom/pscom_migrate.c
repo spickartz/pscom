@@ -85,7 +85,7 @@ int pscom_suspend_plugins(void)
 				pscom_con_shutdown(con);	
 
 				/* wait for response */
-				while (con->read_is_suspended == 0) {
+				while ( (con->read_is_suspended == 0) || (con->write_is_suspended == 0) ) {
 					con->read_start(con);
 					pscom_test_any();
 				}
@@ -177,7 +177,7 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 
 	my_pid = getpid();
 
-#if 1
+#if 0
 	int pid;
 	sscanf((char*)message->payload, "%d", &pid);
 
@@ -189,6 +189,8 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 	sscanf((char*)message->payload, "%d %d", &pid1, &pid2);
 
 	DPRINT(1, "\nINFO: Got MQTT message: %s (%d|%d vs %d = my pid)\n", (char*)message->payload, pid1, pid2, my_pid);
+
+	if(my_pid%2 == 0) usleep(100);
 
 	if((pid1 == my_pid) || (pid2 == my_pid)) {
 #endif
@@ -228,6 +230,8 @@ void pscom_migration_handle_resume_req(void)
 
 	/* reset migration state */
 	pscom.migration_state = PSCOM_MIGRATION_INACTIVE;
+
+	DPRINT(3, "[%d] ||||||||||||||| MIGRATON COMPLETED ||||||||||||||", getpid());
 }
 
 void pscom_migration_handle_shutdown_req(void)
@@ -242,7 +246,7 @@ void pscom_migration_handle_shutdown_req(void)
 	/* change migration state */
 	pscom.migration_state = PSCOM_MIGRATION_ALLOWED;
 
-	DPRINT(3, "!!!!!!!!!!!!!!! MIGRATON ALLOWED !!!!!!!!!!!!!!!");
+	DPRINT(3, "[%d] !!!!!!!!!!!!!!! MIGRATON ALLOWED !!!!!!!!!!!!!!!", getpid());
 
 	/* inform migration-framework */
 	int err = mosquitto_publish(pscom_mosquitto_client,
