@@ -672,7 +672,8 @@ pscom_plugin_t pscom_plugin_shm = {
 	.version	= PSCOM_PLUGIN_VERSION,
 	.arch_id	= PSCOM_ARCH_SHM,
 	.priority	= PSCOM_SHM_PRIO,
-	.properties     = PSCOM_PLUGIN_PROP_NOT_MIGRATABLE,
+	.properties     = PSCOM_PLUGIN_PROP_EMPTY,
+
 	.init		= NULL,
 	.destroy	= pscom_shm_destroy,
 	.sock_init	= pscom_shm_sock_init,

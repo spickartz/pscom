@@ -31,8 +31,8 @@
 #define PSCOM_MOSQUITTO_TOPIC_LENGTH 		50	
 #define PSCOM_MOSQUITTO_TOPIC 			"_migration_req"
 #define PSCOM_MOSQUITTO_RESP_TOPIC 		"_migration_resp"
-#define PSCOM_BROKER_HOST 			"localhost"
-#define PSCOM_BROKER_PORT 			1883
+#define PSCOM_BROKER_HOST 			"centos70"
+#define PSCOM_BROKER_PORT 			1884
 #define PSCOM_KEEP_ALIVE_INT 			60
 
 static int pscom_mosquitto_initialized;
@@ -67,7 +67,7 @@ int pscom_suspend_plugins(void)
 			/* determine corresponding plugin */
 			arch = PSCOM_CON_TYPE2ARCH(con->pub.type);
 		 	plugin = pscom_plugin_by_archid(arch);
-
+			
 			/* suspend all still pending on-demand connections, too */
 			if(con->pub.type == PSCOM_CON_TYPE_ONDEMAND) {
 				con->read_suspend(con);
@@ -103,7 +103,8 @@ int pscom_suspend_plugins(void)
 	list_for_each(pos_plugin, &pscom_plugins) {
 		plugin = list_entry(pos_plugin, pscom_plugin_t, next);
 
-		if (plugin->properties & PSCOM_PLUGIN_PROP_NOT_MIGRATABLE) {
+		if ((plugin->properties & PSCOM_PLUGIN_PROP_NOT_MIGRATABLE) &&
+		    (plugin->destroy)) {
 			DPRINT(1, 
 			       "%s %u: Destroying '%s' ...", 
 			       __FILE__, 

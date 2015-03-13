@@ -111,18 +111,42 @@ void tcp_write_start(pscom_con_t *con)
 {
 	D_TR(printf("write start tcp\n"));
 
-	ufd_event_set(&pscom.ufd, &con->arch.tcp.ufd_info, POLLOUT);
-	_tcp_do_write(con);
-	/* Dont do anything after this line.
-	   _tcp_do_write() can reenter tcp_set_write_start()! */
+	/* was there a state change request? */
+	if (pscom.migration_state == PSCOM_MIGRATION_REQUESTED) {
+		pscom_migration_handle_shutdown_req();
+
+	} else {
+		/* only send if con is not suspended */
+		if(!con->write_is_suspended) {
+			ufd_event_set(&pscom.ufd, &con->arch.tcp.ufd_info, POLLOUT);
+			_tcp_do_write(con);
+			/* Dont do anything after this line.
+			   _tcp_do_write() can reenter tcp_set_write_start()! */
+		}
+	}
+
+	/* ensure to write on resume of the connection */
+	con->write_is_signaled = 1;
 }
 
 
 static
 void tcp_read_start(pscom_con_t *con)
 {
-	D_TR(printf("read start tcp\n"));
-	ufd_event_set(&pscom.ufd, &con->arch.tcp.ufd_info, POLLIN);
+	/* was there a shutdown request? */
+	if (pscom.migration_state == PSCOM_MIGRATION_REQUESTED) {
+		pscom_migration_handle_shutdown_req();
+
+	} else {
+		/* only recv if con is not suspended */
+		if(!con->read_is_suspended) {
+			D_TR(printf("read start tcp\n"));
+			ufd_event_set(&pscom.ufd, &con->arch.tcp.ufd_info, POLLIN);
+		}
+	}
+	
+	/* ensure to recv on resume of the connection */
+	con->read_is_signaled = 1;
 }
 
 
@@ -223,6 +247,7 @@ pscom_plugin_t pscom_plugin_tcp = {
 	.version	= PSCOM_PLUGIN_VERSION,
 	.arch_id	= PSCOM_ARCH_TCP,
 	.priority	= PSCOM_TCP_PRIO,
+	.properties     = PSCOM_PLUGIN_PROP_NOT_MIGRATABLE,
 
 	.init		= NULL,
 	.destroy	= NULL,
