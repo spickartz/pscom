@@ -175,23 +175,27 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
     				 void *arg, 
 				 const struct mosquitto_message *message)
 {
-	int my_pid, pid;
+	int pid = -1;
+	int my_pid = getpid();
 	char* msg;
-	char payload[PSCOM_MOSQUITTO_TOPIC_LENGTH];
+	char payload[PSCOM_MOSQUITTO_TOPIC_LENGTH] = {[0 ... PSCOM_MOSQUITTO_TOPIC_LENGTH-1] = 0};
 
 	strcpy(payload, (char*)message->payload);
 
-	my_pid = getpid();
+	if (!strcmp(payload, "*")) {
+		pid = -2;
+	} else {
+		msg = strtok(payload, " ");
 
-	msg = strtok(payload, " ");
-
-	while(msg) {
-		sscanf(msg, "%d", &pid);
-		if(pid == my_pid) break;
-		msg = strtok(NULL, " ");
+		while (msg) {
+			sscanf(msg, "%d", &pid);
+			if (pid == my_pid)
+				break;
+			msg = strtok(NULL, " ");
+		}
 	}
 
-	if(my_pid == pid) {
+	if (pid == my_pid || pid == -2) {
 
 		DPRINT(1, "\nINFO: Got MQTT message: %s (Found my PID %d)\n", (char*)message->payload, my_pid);
 
