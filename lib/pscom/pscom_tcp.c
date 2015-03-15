@@ -25,6 +25,7 @@
 #include "pscom_ufd.h"
 #include "pscom_precon.h"
 #include "pscom_con.h"
+#include "pscom_migrate.h"
 #include <fcntl.h>
 
 
