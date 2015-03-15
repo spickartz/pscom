@@ -34,6 +34,7 @@ typedef struct psoib_info_msg_s {
 
 
 int psoib_init(void);
+int psoib_destroy(void);
 
 
 // Connection handling:
