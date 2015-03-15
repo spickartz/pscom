@@ -31,8 +31,8 @@
 #define PSCOM_MOSQUITTO_TOPIC_LENGTH 		50	
 #define PSCOM_MOSQUITTO_TOPIC 			"_migration_req"
 #define PSCOM_MOSQUITTO_RESP_TOPIC 		"_migration_resp"
-#define PSCOM_BROKER_HOST 			"centos70"
-#define PSCOM_BROKER_PORT 			1884
+#define PSCOM_BROKER_HOST 			"pandora1"
+#define PSCOM_BROKER_PORT 			1883
 #define PSCOM_KEEP_ALIVE_INT 			60
 
 static int pscom_mosquitto_initialized;
@@ -181,7 +181,7 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 	char payload[PSCOM_MOSQUITTO_TOPIC_LENGTH] = {[0 ... PSCOM_MOSQUITTO_TOPIC_LENGTH-1] = 0};
 
 	strcpy(payload, (char*)message->payload);
-
+	
 	if (!strcmp(payload, "*")) {
 		pid = -2;
 	} else {
@@ -216,7 +216,7 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 			DPRINT(2, "STATE: PSCOM_MIGRATION_FINISHED -> !WARNING! Didn't change state!");
 			//assert(0);
 		} else {
-			DPRINT(2, "STATE: !UNKNOWN!");
+			DPRINT(2, "STATE: !UNKNOWN! (%d)", pscom.migration_state);
 			assert(0);
 		}
 	}
