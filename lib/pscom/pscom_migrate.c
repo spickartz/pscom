@@ -180,24 +180,29 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 	char* msg;
 	char payload[PSCOM_MOSQUITTO_TOPIC_LENGTH] = {[0 ... PSCOM_MOSQUITTO_TOPIC_LENGTH-1] = 0};
 
-	strcpy(payload, (char*)message->payload);
-	
-	if (!strcmp(payload, "*")) {
-		pid = -2;
-	} else {
-		msg = strtok(payload, " ");
+	if ((char*)message->payload) {
+		strcpy(payload, (char*)message->payload);
 
-		while (msg) {
-			sscanf(msg, "%d", &pid);
-			if (pid == my_pid)
-				break;
-			msg = strtok(NULL, " ");
+		if (!strcmp(payload, "*")) {
+			pid = -2;
+		} else {
+			msg = strtok(payload, " ");
+	
+			while (msg) {
+				sscanf(msg, "%d", &pid);
+				if (pid == my_pid)
+					break;
+				msg = strtok(NULL, " ");
+			}
 		}
+	} else {
+		pid = -2;
 	}
+	
 
 	if (pid == my_pid || pid == -2) {
 
-		DPRINT(1, "\nINFO: Got MQTT message: %s (Found my PID %d)\n", (char*)message->payload, my_pid);
+		DPRINT(1, "\nINFO: Got MQTT message: %s (Found my PID %d)\n", payload, my_pid);
 
 		if (pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
 
