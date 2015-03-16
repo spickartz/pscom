@@ -967,7 +967,7 @@ pscom_read_done(pscom_con_t *con, char *buf, size_t len)
 	return;
 	/* --- */
 err_eof:
-	if (!con->state.eof_received && !con->state.close_called) {
+	if (!con->state.eof_received && !con->state.close_called && (con->pub.type != PSCOM_CON_TYPE_ONDEMAND) ) {
 		/* Received an transport layer eof, without
 		   a previous received PSCOM_MSGTYPE_EOF or call to close. -> Throw an IOERROR: */
 		pscom_con_error(con, PSCOM_OP_READ, PSCOM_ERR_IOERROR);

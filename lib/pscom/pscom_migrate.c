@@ -211,7 +211,7 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 			DPRINT(2, "STATE: PSCOM_MIGRATION_FINISHED -> !WARNING! Didn't change state!");
 			//assert(0);
 		} else {
-			DPRINT(2, "STATE: !UNKNOWN!");
+			DPRINT(2, "STATE: !UNKNOWN! (%d)", pscom.migration_state);
 			assert(0);
 		}
 	}
