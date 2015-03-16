@@ -568,7 +568,7 @@ void pscom_shutdown_req_sender_io_done(pscom_request_t *request)
 {
 	pscom_con_t *con = get_con(request->connection);
 
-	con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_SENT,
+	con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_SENT;
 
 	/* hold back all further send requests */
 	con->write_suspend(con);
@@ -586,8 +586,8 @@ void pscom_post_shutdown_msg(pscom_con_t *con)
 		req->pub.connection = &con->pub;
 		req->pub.ops.io_done = pscom_shutdown_req_sender_io_done;
 
-		con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_POSTED,
-			pscom_post_send_direct(req, PSCOM_MSGTYPE_SHUTDOWN_REQ);
+		con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_POSTED;
+		pscom_post_send_direct(req, PSCOM_MSGTYPE_SHUTDOWN_REQ);
 
 		/* wait for request to be processed */
 		pscom_wait(&req->pub);
