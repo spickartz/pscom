@@ -77,14 +77,18 @@ void pscom_ondemand_write_start(pscom_con_t *con)
 	if(!con->write_is_suspended) {
 		if (pscom_name_is_lower(con->arch.ondemand.name, con->pub.socket->local_con_info.name)) {
 
-			printf("TRY TO CONNECT: !IN!DIRECT %s | %d\n", pscom_con_info_str(&con->pub.remote_con_info), con->arch.ondemand.portno);
+			DPRINT(1, "TRY TO CONNECT: !IN!DIRECT %s | %d\n", 
+			       pscom_con_info_str(&con->pub.remote_con_info), 
+			       con->arch.ondemand.portno);
 
 			pscom_ondemand_read_start(con); // be prepared for the back connect
 			pscom_ondemand_indirect_connect(con);
 		} else {
 			pscom_sock_t *sock = get_sock(con->pub.socket);
 
-			printf("TRY TO CONNECT: DIRECT %s | %d\n", pscom_con_info_str(&con->pub.remote_con_info), con->arch.ondemand.portno);
+			DPRINT(1, "TRY TO CONNECT: DIRECT %s | %d\n",
+			       pscom_con_info_str(&con->pub.remote_con_info),
+			       con->arch.ondemand.portno);
 
 			pscom_listener_user_inc(&sock->listen); // listen until we have the connection
 
