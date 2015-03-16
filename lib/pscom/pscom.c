@@ -279,6 +279,10 @@ void pscom_poll_read_resume(pscom_con_t *con)
 int pscom_progress(int timeout)
 {
 	struct list_head *pos, *next;
+	if (pscom.migration_state == PSCOM_MIGRATION_REQUESTED) {
+		pscom_migration_handle_shutdown_req();
+		return 0;
+	}
 
 	list_for_each_safe(pos, next, &pscom.poll_sender) {
 		pscom_con_t *con = list_entry(pos, pscom_con_t, poll_next_send);
