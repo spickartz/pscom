@@ -204,29 +204,41 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 
 		DPRINT(1, "\nINFO: Got MQTT message: %s (Found my PID %d)\n", payload, my_pid);
 
-		if (pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
-
+		switch (pscom.migration_state) {
+		case PSCOM_MIGRATION_INACTIVE:
 			pscom.migration_state = PSCOM_MIGRATION_REQUESTED;
-			DPRINT(2, "\nSTATE: PSCOM_MIGRATION_INACTIVE -> PSCOM_MIGRATION_REQUESTED");
-
-		} else if (pscom.migration_state == PSCOM_MIGRATION_ALLOWED) {
-
+			DPRINT(2, "\nSTATE: PSCOM_MIGRATION_INACTIVE -> "
+ 				  "PSCOM_MIGRATION_REQUESTED");
+			break;
+		case PSCOM_MIGRATION_ALLOWED:
 			pscom.migration_state = PSCOM_MIGRATION_FINISHED;
-			DPRINT(2, "STATE: PSCOM_MIGRATION_ALLOWED -> PSCOM_MIGRATION_FINISHED");
-
-		} else if (pscom.migration_state == PSCOM_MIGRATION_PREPARING) {
-			DPRINT(2, "STATE: PSCOM_MIGRATION_PREPARING -> !WARNING! Didn't change state!");
-			//assert(0);
-		} else if (pscom.migration_state == PSCOM_MIGRATION_FINISHED) {
-			DPRINT(2, "STATE: PSCOM_MIGRATION_FINISHED -> !WARNING! Didn't change state!");
-			//assert(0);
-		} else {
-			DPRINT(2, "STATE: !UNKNOWN! (%d)", pscom.migration_state);
+			DPRINT(2, "STATE: PSCOM_MIGRATION_ALLOWED -> "
+ 				  "PSCOM_MIGRATION_FINISHED");
+			break;
+		case PSCOM_MIGRATION_PREPARING:
+			DPRINT(2, "STATE: PSCOM_MIGRATION_PREPARING -> "
+				  "!WARNING! Didn't change state!");
+//			assert(0);
+			break;
+		case PSCOM_MIGRATION_FINISHED:
+			DPRINT(2, "STATE: PSCOM_MIGRATION_FINISHED -> "
+				  "!WARNING! Didn't change state!");
+//			assert(0);
+			break;
+		case PSCOM_MIGRATION_REQUESTED:
+			DPRINT(2, "STATE: PSCOM_MIGRATION_REQUESTED -> "
+				  "!WARNING! Didn't change state!");
+//			assert(0);
+			break;
+		default:	
+			DPRINT(1, "%s %d: ERROR: Unknown migration state (%d). "
+				  "Abort!", 
+				  __FILE__, __LINE__, 
+				  pscom.migration_state);
 			assert(0);
 		}
-	}
-	else {
-			DPRINT(1, "\nINFO: Got MQTT message: %s (Didn't find my PID %d)\n", (char*)message->payload, my_pid);
+	} else {
+		DPRINT(1, "\nINFO: Got MQTT message: %s (Didn't find my PID %d)\n", payload, my_pid);
 	}
 }
 
