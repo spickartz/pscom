@@ -536,6 +536,8 @@ void shm_cleanup_shm_conn(shm_conn_t *shm)
 static
 void shm_close(pscom_con_t *con)
 {
+	pscom_connection_t *connection = &con->pub;
+
 	if (con->arch.shm.local_com) {
 		int i;
 		shm_conn_t *shm = &con->arch.shm;
@@ -556,7 +558,7 @@ void shm_close(pscom_con_t *con)
 		assert(list_empty(&con->poll_next_send));
 		assert(list_empty(&con->poll_reader.next));
 
-		DPRINT(1, "INFO: >>> SHM CONNECTION CLOSED! <<<");
+		DPRINT(1, "INFO: >>> SHM CONNECTION CLOSED! %s <<<", pscom_con_info_str(&connection->remote_con_info));
 	}
 }
 
