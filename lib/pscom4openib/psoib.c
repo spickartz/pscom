@@ -779,11 +779,17 @@ int psoib_con_connect(psoib_con_info_t *con_info, psoib_info_msg_t *info_msg)
     con_info->n_tosend_toks = 0;
 
     if (move_to_rtr(con_info->qp, con_info->port_info->port_num,
-		    info_msg->lid, info_msg->qp_num))
+		    info_msg->lid, info_msg->qp_num)) {
+	    psoib_dprint(2, "%s %u: ERROR: Could not move qp to RTR. Abort!",
+			 __FILE__, __LINE__);
 	    goto err_move_to_rtr;
+    }
 
-    if (move_to_rts(con_info->qp))
+    if (move_to_rts(con_info->qp)) {
+	    psoib_dprint(2, "%s %u: ERROR: Could not move qp to RTS. Abort!",
+			 __FILE__, __LINE__);
 	    goto err_move_to_rts;
+    }
 
     // Initialize send tokens
     con_info->n_send_toks = psoib_recvq_size; // #tokens = length of _receive_ queue!
