@@ -16,6 +16,7 @@
 #include "pscom_queues.h"
 #include "pscom_req.h"
 #include "pscom_precon.h"
+#include "pscom_migrate.h"
 #include "pscom_plugin.h"
 #include "pslib.h"
 #include <unistd.h>
@@ -565,6 +566,11 @@ void pscom_con_setup_ok(pscom_con_t *con)
 		       pscom_con_state_str(con_state),
 		       pscom_con_type_str(con->pub.type));
 	}
+
+	/* inform MigFra that the connection has been successfully resumed */
+	if (pscom.migration_state == PSCOM_MIGRATION_RESUMING)
+		pscom_report_to_migfra("COMPLETED");
+
 	pscom_con_setup(con);
 }
 

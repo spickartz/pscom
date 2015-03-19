@@ -11,6 +11,7 @@
  */
 
 #include "pscom_con.h"
+#include "pscom_migrate.h"
 #include "pscom_str_util.h"
 
 static

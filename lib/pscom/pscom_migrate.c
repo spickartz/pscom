@@ -230,6 +230,12 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 				  "!WARNING! Didn't change state!");
 //			assert(0);
 			break;
+		case PSCOM_MIGRATION_RESUMING:
+			DPRINT(2, "STATE: PSCOM_MIGRATION_RESUMING -> "
+				  "!WARNING! Didn't change state!");
+//			assert(0);
+			break;
+
 		default:	
 			DPRINT(1, "%s %d: ERROR: Unknown migration state (%d). "
 				  "Abort!", 
@@ -242,22 +248,14 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 	}
 }
 
-void pscom_migration_handle_resume_req(void)
+
+void pscom_report_to_migfra(const char *status)
 {
-	DPRINT(1, "INFO: Handling resume request ...\n");
-	pscom_resume_non_migratable_plugins();
-	DPRINT(1, "INFO: Resume Complete!\n");
-
-	/* reset migration state */
-	pscom.migration_state = PSCOM_MIGRATION_INACTIVE;
-
-	DPRINT(3, "[%d] ||||||||||||||| MIGRATON COMPLETED ||||||||||||||", getpid());
-
 	char topic[PSCOM_MOSQUITTO_TOPIC_LENGTH];
 	char state[] = "65536 : COMPLETED";
 	gethostname(topic, PSCOM_MOSQUITTO_TOPIC_LENGTH);
 	strcat(topic, PSCOM_MOSQUITTO_RESP_TOPIC);
-	sprintf(state, "%d : COMPLETED", getpid());
+	sprintf(state, "%d : %s", getpid(), status);
 
 	/* inform migration-framework */
 	int err = mosquitto_publish(pscom_mosquitto_client,
@@ -268,14 +266,30 @@ void pscom_migration_handle_resume_req(void)
 				    0,
 				    false);
 	if (err != MOSQ_ERR_SUCCESS) {
-		fprintf(stderr, "ERROR: Could not publish on '%s' - %d"
+		fprintf(stderr, "%s %d: ERROR: Could not publish on '%s' - %d"
 		       "(%d [%s])",
+		       __FILE__, __LINE__,
 		       PSCOM_MOSQUITTO_RESP_TOPIC,
 		       err,
 		       errno,
 		       strerror(errno));
 		exit(-1);
 	}
+	
+	/* reset migration state */
+	pscom.migration_state = PSCOM_MIGRATION_INACTIVE;
+}
+
+void pscom_migration_handle_resume_req(void)
+{
+	DPRINT(1, "INFO: Handling resume request ...\n");
+	pscom_resume_non_migratable_plugins();
+	DPRINT(1, "INFO: Resume Complete!\n");
+
+	/* reset migration state */
+	pscom.migration_state = PSCOM_MIGRATION_RESUMING;
+
+	DPRINT(3, "[%d] ||||||||||||||| MIGRATON COMPLETED ||||||||||||||", getpid());
 }
 
 void pscom_migration_handle_shutdown_req(void)
@@ -307,8 +321,9 @@ void pscom_migration_handle_shutdown_req(void)
 				    0,
 				    false);
 	if (err != MOSQ_ERR_SUCCESS) {
-		fprintf(stderr, "ERROR: Could not publish on '%s' - %d"
+		fprintf(stderr, "%s %d: ERROR: Could not publish on '%s' - %d"
 		       "(%d [%s])", 
+		       __FILE__, __LINE__,
 		       PSCOM_MOSQUITTO_RESP_TOPIC,
 		       err,
 		       errno, 

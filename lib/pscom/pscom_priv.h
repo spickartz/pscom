@@ -371,6 +371,7 @@ typedef enum PSCOM_Migration_state {
 	PSCOM_MIGRATION_PREPARING,
 	PSCOM_MIGRATION_ALLOWED,
 	PSCOM_MIGRATION_FINISHED,
+	PSCOM_MIGRATION_RESUMING,
 } pscom_migration_state_t;
 
 typedef enum PSCOM_Shutdown_state {

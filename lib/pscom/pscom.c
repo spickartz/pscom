@@ -258,37 +258,10 @@ void pscom_poll_read_resume(pscom_con_t *con)
 }
 
 
-static
-int pscom_any_con_in_precon(void) {
-	struct list_head *pos_sock;
-	struct list_head *pos_con;
-	int arch;
-	pscom_plugin_t *plugin;
-	
-	int res = 0;
-	/* iterate over all sockets */
-	list_for_each(pos_sock, &pscom.sockets) {
-		pscom_sock_t *sock = list_entry(pos_sock, pscom_sock_t, next);
-
-		/* iterate over all connections */
-		list_for_each(pos_con, &sock->connections) {
-			pscom_con_t *con = list_entry(pos_con,
-			    			      pscom_con_t, 
-						      next);
-			if (con->precon) {
-				res = 1;
-				break;
-			}
-		}
-	}
-
-	return res;
-}
-
 int pscom_progress(int timeout)
 {
 	struct list_head *pos, *next;
-	if ((pscom.migration_state == PSCOM_MIGRATION_REQUESTED) && !pscom_any_con_in_precon()) {
+	if ((pscom.migration_state == PSCOM_MIGRATION_REQUESTED)) {
 		pscom_migration_handle_shutdown_req();
 		return 0;
 	}
