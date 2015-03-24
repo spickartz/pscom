@@ -97,8 +97,9 @@ void pscom_ondemand_write_start(pscom_con_t *con)
 
 			pscom_listener_user_dec(&sock->listen);
 		}
+	} else {
+		con->write_is_signaled = 1;
 	}
-	con->write_is_signaled = 1;
 }
 
 
@@ -113,8 +114,9 @@ void pscom_ondemand_read_start(pscom_con_t *con)
 			con->arch.ondemand.active = 1;
 			pscom_listener_active_inc(&sock->listen);
 		}
+	} else {
+		con->read_is_signaled = 1;
 	}
-	con->read_is_signaled = 1;
 }
 
 
