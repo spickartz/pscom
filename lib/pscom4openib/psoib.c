@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <assert.h>
+#include <sched.h>
 #include <sys/resource.h> // getrlimit
 
 /* #include <sysfs/libsysfs.h> */
@@ -1124,9 +1125,10 @@ int psoib_sendv(psoib_con_info_t *con_info, struct iovec *iov, int size)
 
 void psoib_send_eof(psoib_con_info_t *con_info)
 {
-	_psoib_sendv(con_info, NULL, 0, PSOIB_MAGIC_EOF);
-	while (con_info->outstanding_cq_entries)
+//	_psoib_sendv(con_info, NULL, 0, PSOIB_MAGIC_EOF);
+	while (con_info->outstanding_cq_entries) {
 		psoib_poll(&default_hca, 1);
+	}
 
 	con_info->con_broken = 1; // Do not send more
 }
