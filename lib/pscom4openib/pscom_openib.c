@@ -144,6 +144,11 @@ void pscom_openib_con_close(pscom_con_t *con)
 
 	if (!mcon) return;
 
+	while (!list_empty(&con->sendq)) {
+		con->do_write(con);
+		sched_yield();
+	}
+
 	psoib_send_eof(mcon);
 	pscom_openib_con_cleanup(con);
 }
