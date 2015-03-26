@@ -61,7 +61,6 @@ void pscom_listener_user_dec(struct pscom_listener *listener)
 		int fd = pscom_listener_get_fd(listener);
 		if (fd >= 0) {
 			printf("======================== CLOSE =========================\n");
-			assert(0);
 			close(fd);
 		} else {
 			DPRINT(1, "warning: %s() fd already closed", __func__);

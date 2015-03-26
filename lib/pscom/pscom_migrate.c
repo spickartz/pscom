@@ -109,7 +109,9 @@ int pscom_suspend_plugins(void)
 			       __FILE__, 
 			       __LINE__,
 			       plugin->name);
-			plugin->destroy();
+			if(plugin->destroy) {
+				plugin->destroy();
+			}
 			DPRINT(1, 
 			       "%s %u: Successfully destroyed '%s'!", 
 			       __FILE__, 
