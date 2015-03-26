@@ -77,6 +77,9 @@ void pscom_sock_close(pscom_sock_t *sock)
 {
 	assert(sock->magic == MAGIC_SOCKET);
 
+	/* Close the listen socket kept open for migration: */
+	pscom_listener_user_dec(&sock->listen);
+
 retry:
 	pscom_sock_stop_listen(sock);
 
