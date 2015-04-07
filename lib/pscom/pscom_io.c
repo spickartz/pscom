@@ -609,6 +609,7 @@ void pscom_reset_con_to_ondemand(pscom_con_t *con)
 {
 	pscom_err_t rc;
 	pscom_connection_t *connection = &con->pub;
+	pscom_socket_t *socket = connection->socket;
 
 	/* save name and port */
 	int node_id = connection->remote_con_info.node_id;
@@ -624,6 +625,10 @@ void pscom_reset_con_to_ondemand(pscom_con_t *con)
 
 	con->shutdown_req_status = PSCOM_SHUTDOWN_INACTIVE;
 	con->shutdown_ack_status = PSCOM_SHUTDOWN_INACTIVE;
+
+	/* Make sure that if the session has not been started via ondemand,
+	   the accept-related callback gets now disabled: */
+	socket->ops.con_accept = NULL;
 
 	/* re-create on-demand connection: */
 	if ((rc = pscom_connect_ondemand(connection, 
