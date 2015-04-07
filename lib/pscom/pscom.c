@@ -288,7 +288,9 @@ int pscom_any_con_in_precon(void) {
 int pscom_progress(int timeout)
 {
 	struct list_head *pos, *next;
-	if ((pscom.migration_state == PSCOM_MIGRATION_REQUESTED) && !pscom_any_con_in_precon()) {
+	if (pscom.env.suspend_resume && 
+	    (pscom.migration_state == PSCOM_MIGRATION_REQUESTED) && 
+	    !pscom_any_con_in_precon()) {
 		pscom_migration_handle_shutdown_req();
 		return 0;
 	}
