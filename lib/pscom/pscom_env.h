@@ -44,6 +44,8 @@
 #define ENV_RENDEZVOUS_ELAN "PSP_RENDEZVOUS_ELAN"
 #define ENV_RENDEZVOUS_EXTOLL "PSP_RENDEZVOUS_EXTOLL"
 #define ENV_RENDEZVOUS_VELO "PSP_RENDEZVOUS_VELO"
+/* Enable/Disable support for suspend/resume 0: Disable, 1: Enable */
+#define ENV_SUSPEND_RESUME "PSP_SUSPEND_RESUME"
 
 /* Used in constructing the UUID for QLogic */
 #define ENV_PSM_UNIQ_ID "PSP_PSM_UNIQ_ID"
@@ -150,6 +152,7 @@ struct PSCOM_env {
 	unsigned int	rendezvous_size_elan;
 	unsigned int	rendezvous_size_extoll;
 	unsigned int	rendezvous_size_velo;
+	unsigned int	suspend_resume;
 	unsigned int	psm_uniq_id;
 	int		sigquit;
 	unsigned int	readahead;
@@ -181,6 +184,7 @@ struct PSCOM_env {
 	.rendezvous_size_elan = ~0, /* default rendezvous_size for elan */ \
 	.rendezvous_size_extoll = ~0, /* default rendezvous_size for extoll */ \
 	.rendezvous_size_velo = 1024, /* default rendezvous_size for velo */ \
+	.suspend_resume = 0,						\
 	.psm_uniq_id = 0,						\
 	.sigquit = 0,							\
 	.readahead = 100,						\

@@ -113,7 +113,8 @@ void tcp_write_start(pscom_con_t *con)
 	D_TR(printf("write start tcp\n"));
 
 	/* was there a state change request? */
-	if (pscom.migration_state == PSCOM_MIGRATION_REQUESTED) {
+	if (pscom.env.suspend_resume &&
+	    pscom.migration_state == PSCOM_MIGRATION_REQUESTED) {
 		pscom_migration_handle_shutdown_req();
 
 	} else {
@@ -135,7 +136,8 @@ static
 void tcp_read_start(pscom_con_t *con)
 {
 	/* was there a shutdown request? */
-	if (pscom.migration_state == PSCOM_MIGRATION_REQUESTED) {
+	if (pscom.env.suspend_resume &&
+	    pscom.migration_state == PSCOM_MIGRATION_REQUESTED) {
 		pscom_migration_handle_shutdown_req();
 
 	} else {

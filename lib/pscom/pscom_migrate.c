@@ -345,6 +345,10 @@ void pscom_migration_handle_shutdown_req(void)
 int pscom_migration_init(void)
 {
 	pscom_mosquitto_initialized = 0;
+
+	/* leave if feature should be disabled */
+	if (pscom.env.suspend_resume == 0)
+		return 0;
 	
 	/* initialize libmosquitto */
 	if (mosquitto_lib_init() != MOSQ_ERR_SUCCESS) {
