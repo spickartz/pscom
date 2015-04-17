@@ -267,7 +267,7 @@ void pscom_migration_handle_resume_req(void)
 				    topic,
 				    sizeof(state),
 				    (const void*)state,
-				    0,
+				    1,
 				    false);
 	if (err != MOSQ_ERR_SUCCESS) {
 		fprintf(stderr, "ERROR: Could not publish on '%s' - %d"
