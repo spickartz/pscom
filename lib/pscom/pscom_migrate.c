@@ -265,7 +265,7 @@ void pscom_report_to_migfra(const char *status)
 				    topic,
 				    sizeof(state),
 				    (const void*)state,
-				    0,
+				    1,
 				    false);
 	if (err != MOSQ_ERR_SUCCESS) {
 		fprintf(stderr, "%s %d: ERROR: Could not publish on '%s' - %d"
