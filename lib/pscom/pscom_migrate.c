@@ -24,16 +24,7 @@
 #include <errno.h>
 
 #define _PSCOM_SUPPORT_MIGRATION
-
 #ifdef _PSCOM_SUPPORT_MIGRATION
-
-#define PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH 	50	
-#define PSCOM_MOSQUITTO_TOPIC_LENGTH 		50	
-#define PSCOM_MOSQUITTO_TOPIC 			"_migration_req"
-#define PSCOM_MOSQUITTO_RESP_TOPIC 		"_migration_resp"
-#define PSCOM_BROKER_HOST 			"pandora1"
-#define PSCOM_BROKER_PORT 			1883
-#define PSCOM_KEEP_ALIVE_INT 			60
 
 static int pscom_mosquitto_initialized;
 static struct mosquitto *pscom_mosquitto_client;
@@ -81,7 +72,7 @@ int pscom_suspend_plugins(void)
 			/* shutdown the connection if not migratable */
 			if (plugin->properties & 
 			    PSCOM_PLUGIN_PROP_NOT_MIGRATABLE) {
-
+	
 				pscom_con_shutdown(con);	
 
 				/* wait for response */
@@ -497,4 +488,4 @@ void pscom_migration_handle_shutdown_req(void)
 {
 	return;
 }
-#endif
+#endif /* _PSCOM_SUPPORT_MIGRATION */
