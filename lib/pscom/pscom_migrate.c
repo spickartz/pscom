@@ -28,6 +28,40 @@
 
 static int pscom_mosquitto_initialized;
 static struct mosquitto *pscom_mosquitto_client;
+static  char pscom_mosquitto_req_topic[PSCOM_MOSQUITTO_TOPIC_LENGTH] = PSCOM_MOSQUITTO_REQ_TOPIC;
+static  char pscom_mosquitto_resp_topic[PSCOM_MOSQUITTO_TOPIC_LENGTH] = PSCOM_MOSQUITTO_RESP_TOPIC;
+
+static inline int
+pscom_str_replace(char *search_str, char *replace_str, char *str)
+{
+	char *tmp_str, *search_start;
+	int str_len = 0;
+
+	/* find search_str in str */ 
+	if ((search_start = strstr(str, search_str)) == NULL) {
+		return -1;
+	}
+
+	/* allocate memory */
+	if ((tmp_str = (char*)malloc(strlen(str) * sizeof(char))) == NULL) {
+		return -1;
+	}
+
+	/* copy original  and compute string length */
+	strcpy(tmp_str, str);
+	str_len = search_start - str;
+	str[str_len] = '\0';
+
+
+	strcat(str, replace_str);
+	str_len += strlen(search_str);
+	strcat(str, (char*)tmp_str+str_len);
+
+	free(tmp_str);
+
+	return 0;
+}
+
 
 static
 int pscom_suspend_plugins(void)
@@ -244,16 +278,12 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 
 void pscom_report_to_migfra(const char *status)
 {
-	char topic[PSCOM_MOSQUITTO_TOPIC_LENGTH];
 	char state[] = "65536 : COMPLETED";
-	gethostname(topic, PSCOM_MOSQUITTO_TOPIC_LENGTH);
-	strcat(topic, PSCOM_MOSQUITTO_RESP_TOPIC);
 	sprintf(state, "%d : %s", getpid(), status);
 
-	/* inform migration-framework */
 	int err = mosquitto_publish(pscom_mosquitto_client,
 				    NULL,
-				    topic,
+				    pscom_mosquitto_resp_topic,
 				    sizeof(state),
 				    (const void*)state,
 				    1,
@@ -299,16 +329,13 @@ void pscom_migration_handle_shutdown_req(void)
 
 	DPRINT(3, "[%d] !!!!!!!!!!!!!!! MIGRATON ALLOWED !!!!!!!!!!!!!!!", getpid());
 
-	char topic[PSCOM_MOSQUITTO_TOPIC_LENGTH];
 	char state[] = "65536 : ALLOWED";
-	gethostname(topic, PSCOM_MOSQUITTO_TOPIC_LENGTH);
-	strcat(topic, PSCOM_MOSQUITTO_RESP_TOPIC);
 	sprintf(state, "%d : ALLOWED", getpid());
 
 	/* inform migration-framework */
 	int err = mosquitto_publish(pscom_mosquitto_client,
 	    			    NULL,
-				    topic,
+				    pscom_mosquitto_resp_topic,
 				    sizeof(state),
 				    (const void*)state,
 				    0,
@@ -352,7 +379,7 @@ int pscom_migration_init(void)
 	char client_name[PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH];
 	char my_pid[10];
 	sprintf(my_pid, "_%d", getpid());
-	gethostname(client_name, PSCOM_MOSQUITTO_TOPIC_LENGTH);
+	gethostname(client_name, PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH);
 	strcat(client_name, my_pid);
 	pscom_mosquitto_client = mosquitto_new(client_name, 
 	    				       true,
@@ -384,26 +411,37 @@ int pscom_migration_init(void)
 		DPRINT(1, "Connected to the Mosquitto broker");
 	}
 
+	/* determine hostname and PID */
+	char hostname[PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH];
+	gethostname(hostname, PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH);
+	char pid[PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH];
+	sprintf(pid, "%d", getpid());
+
+	/* create topics */
+	pscom_str_replace("<hostname>", hostname, pscom_mosquitto_req_topic);
+	pscom_str_replace("<pid>", "+", pscom_mosquitto_req_topic);
+	pscom_str_replace("<hostname>", hostname, pscom_mosquitto_resp_topic);
+	pscom_str_replace("<pid>", pid, pscom_mosquitto_resp_topic);
+
 	/* subscribe to the migration command topic */
-	char topic[PSCOM_MOSQUITTO_TOPIC_LENGTH];
-	gethostname(topic, PSCOM_MOSQUITTO_TOPIC_LENGTH);
-	strcat(topic, PSCOM_MOSQUITTO_TOPIC);
 	err = mosquitto_subscribe(pscom_mosquitto_client,
 				  NULL,
-				  topic,
+				  pscom_mosquitto_req_topic,
 				  0);
 	if (err != MOSQ_ERR_SUCCESS) {
 		DPRINT(1, "%s %d: ERROR: Could not subscribe to '%s' - %d"
 		       "(%d [%s])", 
 		       __FILE__, __LINE__,
-		       topic,
+		       pscom_mosquitto_req_topic,
 		       err,
 		       errno, 
 		       strerror(errno));
 		return PSCOM_ERR_STDERROR;
-	} else {
-		DPRINT(1, "Sucessfuly subscribed to '%s'", topic);
 	}
+
+
+	DPRINT(1, "INFO: Subscribing to '%s'", pscom_mosquitto_req_topic);
+	DPRINT(1, "INFO: Publishing  on '%s'", pscom_mosquitto_resp_topic);
 
 	/* set the subscription callback */
 	mosquitto_message_callback_set(pscom_mosquitto_client,
@@ -430,12 +468,12 @@ int pscom_migration_cleanup(void)
 	/* unsubscribe from the migration command topic */	
 	err = mosquitto_unsubscribe(pscom_mosquitto_client,
 				    NULL,
-				    PSCOM_MOSQUITTO_TOPIC);
+				    PSCOM_MOSQUITTO_REQ_TOPIC);
 	if (err != MOSQ_ERR_SUCCESS) {
 		DPRINT(1, "%s %d: ERROR: Could not unsubscribe from '%s' - %d"
 		       "(%d [%s])", 
 		       __FILE__, __LINE__,
-		       PSCOM_MOSQUITTO_TOPIC,
+		       PSCOM_MOSQUITTO_REQ_TOPIC,
 		       err,
 		       errno, 
 		       strerror(errno));
