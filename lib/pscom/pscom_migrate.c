@@ -233,12 +233,14 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 
 		switch (pscom.migration_state) {
 		case PSCOM_MIGRATION_INACTIVE:
-			pscom.migration_state = PSCOM_MIGRATION_REQUESTED;
+//			pscom.migration_state = PSCOM_MIGRATION_REQUESTED;
+			pscom_migration_handle_shutdown_req();
 			DPRINT(2, "\nSTATE: PSCOM_MIGRATION_INACTIVE -> "
  				  "PSCOM_MIGRATION_REQUESTED");
 			break;
 		case PSCOM_MIGRATION_ALLOWED:
-			pscom.migration_state = PSCOM_MIGRATION_FINISHED;
+//			pscom.migration_state = PSCOM_MIGRATION_FINISHED;
+			pscom_migration_handle_resume_req();
 			DPRINT(2, "STATE: PSCOM_MIGRATION_ALLOWED -> "
  				  "PSCOM_MIGRATION_FINISHED");
 			break;
@@ -352,12 +354,12 @@ void pscom_migration_handle_shutdown_req(void)
 	}
 
 	/* wait until the migration has terminated */
-	while (pscom.migration_state != PSCOM_MIGRATION_FINISHED) {
+/*	while (pscom.migration_state != PSCOM_MIGRATION_FINISHED) {
 		sched_yield();
 	}
-
+*/
 	/* resume the connections now */	
-	pscom_migration_handle_resume_req();
+//	pscom_migration_handle_resume_req();
 }
 
 int pscom_migration_init(void)
@@ -456,7 +458,7 @@ int pscom_migration_init(void)
 		       err);
 		return PSCOM_ERR_STDERROR;
 	}
-
+	
 	pscom_mosquitto_initialized = 1;
 	return PSCOM_SUCCESS;
 }

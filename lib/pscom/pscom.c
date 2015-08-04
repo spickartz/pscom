@@ -45,7 +45,7 @@
 #include "pslib.h"
 
 pscom_t pscom = {
-	.threaded = 0,                                  /* default is unthreaded */
+	.threaded = 1,                                  /* default is unthreaded */
 	.migration_state = PSCOM_MIGRATION_INACTIVE,    /* no shutdown request*/
 
 	/* parameter from environment */
@@ -334,9 +334,12 @@ int pscom_init(int pscom_version)
 
 	{
 		int res_mutex_init;
-		res_mutex_init = pthread_mutex_init(&pscom.global_lock, NULL);
+		pthread_mutexattr_t nested_attr;
+		pthread_mutexattr_init(&nested_attr);
+		pthread_mutexattr_settype(&nested_attr, PTHREAD_MUTEX_RECURSIVE);
+		res_mutex_init = pthread_mutex_init(&pscom.global_lock, &nested_attr);
 		assert(res_mutex_init == 0);
-		res_mutex_init = pthread_mutex_init(&pscom.lock_requests, NULL);
+		res_mutex_init = pthread_mutex_init(&pscom.lock_requests, &nested_attr);
 		assert(res_mutex_init == 0);
 	}
 
