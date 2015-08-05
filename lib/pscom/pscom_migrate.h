@@ -20,6 +20,14 @@
 #include <sys/types.h>
 #include <mosquitto.h>
 
+#define PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH 	50
+#define PSCOM_MOSQUITTO_TOPIC_LENGTH 		50
+#define PSCOM_MOSQUITTO_REQ_TOPIC 		"fast/pscom/<hostname>/<pid>/request"
+#define PSCOM_MOSQUITTO_RESP_TOPIC 		"fast/pscom/<hostname>/<pid>/response"
+#define PSCOM_BROKER_HOST 			"devon"
+#define PSCOM_BROKER_PORT 			1883
+#define PSCOM_KEEP_ALIVE_INT 			60
+
 int pscom_migration_init(void);
 int pscom_migration_cleanup(void);
 
