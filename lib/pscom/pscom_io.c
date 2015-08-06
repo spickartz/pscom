@@ -689,7 +689,7 @@ void pscom_shutdown_req_receiver_io_done(pscom_request_t *request)
 
 		assert(pscom.migration_state == PSCOM_MIGRATION_PREPARING);
 
-		assert(con->shutdown_req_status == PSCOM_SHUTDOWN_REQ_SENT);
+		assert((con->shutdown_req_status == PSCOM_SHUTDOWN_REQ_SENT) || (con->shutdown_req_status == PSCOM_SHUTDOWN_REQ_POSTED));
 
 		/* We received a REQ instead of an expected ACK! Therefore, we do not answer likewise with an ACK
 		   but close the connection directly because no more data is expected an our REQ has also already
