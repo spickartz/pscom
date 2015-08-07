@@ -37,7 +37,7 @@ pscom_str_replace(char *search_str, char *replace_str, char *str)
 	char *tmp_str, *search_start;
 	int str_len = 0;
 
-	/* find search_str in str */ 
+	/* find search_str in str */
 	if ((search_start = strstr(str, search_str)) == NULL) {
 		return -1;
 	}
@@ -438,7 +438,6 @@ int pscom_migration_init(void)
 		       strerror(errno));
 		return PSCOM_ERR_STDERROR;
 	}
-
 
 	DPRINT(1, "INFO: Subscribing to '%s'", pscom_mosquitto_req_topic);
 	DPRINT(1, "INFO: Publishing  on '%s'", pscom_mosquitto_resp_topic);
