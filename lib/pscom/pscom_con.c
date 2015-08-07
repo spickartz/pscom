@@ -568,7 +568,8 @@ void pscom_con_setup_ok(pscom_con_t *con)
 	}
 
 	/* inform MigFra that the connection has been successfully resumed */
-	if (pscom.migration_state == PSCOM_MIGRATION_RESUMING)
+	if ((pscom.migration_state == PSCOM_MIGRATION_RESUMING) && 
+	    !pscom_any_con_in_precon())
 		pscom_report_to_migfra("COMPLETED");
 
 	pscom_con_setup(con);
@@ -698,6 +699,32 @@ int pscom_is_local(pscom_socket_t *socket, int nodeid, int portno)
 {
 	return ((nodeid == -1) || (nodeid == INADDR_LOOPBACK) || (nodeid == pscom_get_nodeid())) &&
 		((portno == -1) || (portno == socket->listen_portno));
+}
+
+int pscom_any_con_in_precon(void) {
+	struct list_head *pos_sock;
+	struct list_head *pos_con;
+	int arch;
+	pscom_plugin_t *plugin;
+
+	int res = 0;
+	/* iterate over all sockets */
+	list_for_each(pos_sock, &pscom.sockets) {
+		pscom_sock_t *sock = list_entry(pos_sock, pscom_sock_t, next);
+
+		/* iterate over all connections */
+		list_for_each(pos_con, &sock->connections) {
+			pscom_con_t *con = list_entry(pos_con,
+			    			      pscom_con_t,
+						      next);
+			if (con->precon) {
+				res = 1;
+				break;
+			}
+		}
+	}
+
+	return res;
 }
 
 
