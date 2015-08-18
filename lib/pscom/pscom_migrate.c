@@ -30,6 +30,7 @@
 
 static timer_t pscom_timer;
 static int pscom_mosquitto_initialized;
+static int pscom_remote_migration_cnt;
 static struct mosquitto *pscom_mosquitto_client;
 static char pscom_hostname[PSCOM_MOSQUITTO_CLIENT_NAME_LENGTH];
 static  char pscom_mosquitto_req_topic[PSCOM_MOSQUITTO_TOPIC_LENGTH] = PSCOM_MOSQUITTO_REQ_TOPIC;
@@ -64,6 +65,43 @@ pscom_str_replace(char *search_str, char *replace_str, char *str)
 	free(tmp_str);
 
 	return 0;
+}
+
+static inline
+void pscom_remote_migration_inc(void)
+{
+	pscom_remote_migration_cnt++;
+	DPRINT(1, "INCREMENT: %d\n", pscom_remote_migration_cnt);
+}
+
+static inline
+void pscom_remote_migration_dec(void)
+{
+	assert(pscom_remote_migration_cnt > 0);
+
+	pscom_remote_migration_cnt--;
+	DPRINT(1, "DECREMENT: %d\n", pscom_remote_migration_cnt);
+
+	/* disarm timer if counter equals zero */
+	if (!pscom_remote_migration_cnt) {
+		struct itimerspec timerspec = {
+			.it_interval = {
+				.tv_sec = 0,
+			},
+			.it_value = {
+				.tv_sec = 0,
+			},
+		};
+
+		if (timer_settime(pscom_timer, 0, &timerspec, NULL) < 0) {
+			DPRINT(1, "%s %d: ERROR: Could not disarm the timer; "
+			       "timer_settime() failed -- %s (%d)\n",
+			       __FILE__, __LINE__,
+			       strerror(errno),
+			       errno);
+			exit(-1);
+		}
+	}
 }
 
 static
@@ -232,89 +270,84 @@ int pscom_resume_non_migratable_plugins(void)
 	return PSCOM_SUCCESS;
 }
 
+
 static
-void pscom_message_callback(struct mosquitto *mosquitto_client, 
-    				 void *arg, 
+void pscom_handle_local_migration_request(const struct mosquitto_message *message)
+{
+	DPRINT(1, "%s %d: INFO: Got local migration request",
+	       __FILE__, __LINE__);
+
+	switch (pscom.migration_state) {
+	case PSCOM_MIGRATION_INACTIVE:
+//		pscom.migration_state = PSCOM_MIGRATION_REQUESTED;
+		pscom_migration_handle_shutdown_req();
+		DPRINT(2, "\nSTATE: PSCOM_MIGRATION_INACTIVE -> "
+ 			  "PSCOM_MIGRATION_REQUESTED");
+		break;
+	case PSCOM_MIGRATION_ALLOWED:
+//		pscom.migration_state = PSCOM_MIGRATION_FINISHED;
+		pscom_migration_handle_resume_req();
+		DPRINT(2, "STATE: PSCOM_MIGRATION_ALLOWED -> "
+ 			  "PSCOM_MIGRATION_FINISHED");
+		break;
+	case PSCOM_MIGRATION_PREPARING:
+		DPRINT(2, "STATE: PSCOM_MIGRATION_PREPARING -> "
+			  "!WARNING! Didn't change state!");
+//		assert(0);
+		break;
+	case PSCOM_MIGRATION_FINISHED:
+		DPRINT(2, "STATE: PSCOM_MIGRATION_FINISHED -> "
+			  "!WARNING! Didn't change state!");
+//		assert(0);
+		break;
+	case PSCOM_MIGRATION_REQUESTED:
+		DPRINT(2, "STATE: PSCOM_MIGRATION_REQUESTED -> "
+			  "!WARNING! Didn't change state!");
+//		assert(0);
+		break;
+	case PSCOM_MIGRATION_RESUMING:
+		DPRINT(2, "STATE: PSCOM_MIGRATION_RESUMING -> "
+			  "!WARNING! Didn't change state!");
+//		assert(0);
+		break;
+
+	default:
+		DPRINT(1, "%s %d: ERROR: Unknown migration state (%d). "
+			  "Abort!",
+			  __FILE__, __LINE__,
+			  pscom.migration_state);
+		assert(0);
+	}
+}
+
+static
+void pscom_handle_remote_migration_request(const struct mosquitto_message *message)
+{
+	/* trigger timer if there is a request */
+	if (strstr((char*)message->payload, "suspend")) {
+		pscom_remote_migration_inc();
+		if (pscom_remote_migration_cnt == 1) {
+			pscom_trigger_communication_timer();
+		}
+	} else if (strstr((char*)message->payload, "resume")) {
+		pscom_remote_migration_dec();
+	}
+
+	return;
+}
+
+static
+void pscom_message_callback(struct mosquitto *mosquitto_client,
+    				 void *arg,
 				 const struct mosquitto_message *message)
 {
-	/* determine destination host for the message */
-	if (strstr(message->topic, pscom_hostname) == NULL) {
-		pscom_trigger_communication_timer();
-		return;
-	}
-
-	int pid = -1;
-	int my_pid = getpid();
-	char* msg;
-	char payload[PSCOM_MOSQUITTO_TOPIC_LENGTH] = {[0 ... PSCOM_MOSQUITTO_TOPIC_LENGTH-1] = 0};
-
-	if ((char*)message->payload) {
-		strcpy(payload, (char*)message->payload);
-
-		if (!strcmp(payload, "*")) {
-			pid = -2;
-		} else {
-			msg = strtok(payload, " ");
-	
-			while (msg) {
-				sscanf(msg, "%d", &pid);
-				if (pid == my_pid)
-					break;
-				msg = strtok(NULL, " ");
-			}
-		}
+	if (strstr(message->topic, pscom_hostname)) {
+		pscom_handle_local_migration_request(message);
 	} else {
-		pid = -2;
+		pscom_handle_remote_migration_request(message);
 	}
 
-	if (pid == my_pid || pid == -2) {
-
-		DPRINT(1, "\nINFO: Got MQTT message: %s (Found my PID %d)\n", payload, my_pid);
-
-		switch (pscom.migration_state) {
-		case PSCOM_MIGRATION_INACTIVE:
-//			pscom.migration_state = PSCOM_MIGRATION_REQUESTED;
-			pscom_migration_handle_shutdown_req();
-			DPRINT(2, "\nSTATE: PSCOM_MIGRATION_INACTIVE -> "
- 				  "PSCOM_MIGRATION_REQUESTED");
-			break;
-		case PSCOM_MIGRATION_ALLOWED:
-//			pscom.migration_state = PSCOM_MIGRATION_FINISHED;
-			pscom_migration_handle_resume_req();
-			DPRINT(2, "STATE: PSCOM_MIGRATION_ALLOWED -> "
- 				  "PSCOM_MIGRATION_FINISHED");
-			break;
-		case PSCOM_MIGRATION_PREPARING:
-			DPRINT(2, "STATE: PSCOM_MIGRATION_PREPARING -> "
-				  "!WARNING! Didn't change state!");
-//			assert(0);
-			break;
-		case PSCOM_MIGRATION_FINISHED:
-			DPRINT(2, "STATE: PSCOM_MIGRATION_FINISHED -> "
-				  "!WARNING! Didn't change state!");
-//			assert(0);
-			break;
-		case PSCOM_MIGRATION_REQUESTED:
-			DPRINT(2, "STATE: PSCOM_MIGRATION_REQUESTED -> "
-				  "!WARNING! Didn't change state!");
-//			assert(0);
-			break;
-		case PSCOM_MIGRATION_RESUMING:
-			DPRINT(2, "STATE: PSCOM_MIGRATION_RESUMING -> "
-				  "!WARNING! Didn't change state!");
-//			assert(0);
-			break;
-
-		default:	
-			DPRINT(1, "%s %d: ERROR: Unknown migration state (%d). "
-				  "Abort!", 
-				  __FILE__, __LINE__, 
-				  pscom.migration_state);
-			assert(0);
-		}
-	} else {
-		DPRINT(1, "\nINFO: Got MQTT message: %s (Didn't find my PID %d)\n", payload, my_pid);
-	}
+	return;
 }
 
 
@@ -479,7 +512,6 @@ int pscom_migration_init(void)
 		       strerror(errno));
 		return PSCOM_ERR_STDERROR;
 	}
-
 
 	DPRINT(1, "INFO: Subscribing to '%s'", pscom_mosquitto_req_topic);
 	DPRINT(1, "INFO: Publishing  on '%s'", pscom_mosquitto_resp_topic);
