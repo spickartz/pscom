@@ -584,11 +584,11 @@ int pscom_migration_cleanup(void)
 #else
 int pscom_migration_init(void)
 {
-	return 0;
+	return PSCOM_SUCCESS;
 }
 int pscom_migration_cleanup(void)
 {
-	return 0;
+	return PSCOM_SUCCESS;
 }
 void pscom_migration_handle_shutdown_req(void)
 {
