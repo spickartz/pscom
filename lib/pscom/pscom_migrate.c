@@ -565,7 +565,18 @@ int pscom_migration_cleanup(void)
 	if (mosquitto_lib_cleanup() != MOSQ_ERR_SUCCESS) {
 		DPRINT(1, "%s %d: ERROR: Could not cleanup libmosquitto ",
 		       __FILE__, __LINE__);
+		return PSCOM_ERR_STDERROR;
 	}
+
+	/* delete the timer */
+	if (timer_delete(pscom_timer) < 0) {
+		DPRINT(1, "%s %d: ERROR: timer_delete() failed -- %s (%d)\n",
+		    __FILE__, __LINE__,
+		    strerror(errno),
+		    errno);
+		return PSCOM_ERR_STDERROR;
+	}
+
 
 	return PSCOM_SUCCESS;
 }
