@@ -107,7 +107,11 @@ void pscom_remote_migration_dec(void)
 static
 void pscom_trigger_progress(union sigval sv)
 {
-	DPRINT(1, "Try to make progress in communication ... ");
+
+	if (pscom_trylock() == 0) {
+		pscom_test_any();
+		pscom_unlock();
+	}
 
 	return;
 }
@@ -118,10 +122,10 @@ int pscom_trigger_communication_timer(void)
 	/* arm the timer */
 	struct itimerspec timerspec = {
 		.it_interval = {
-			.tv_sec = 1,
+			.tv_nsec = 100000,
 		},
 		.it_value = {
-			.tv_sec = 1,
+			.tv_nsec = 100000,
 		},
 	};
 
