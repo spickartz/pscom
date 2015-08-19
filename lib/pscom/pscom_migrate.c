@@ -525,4 +525,9 @@ void pscom_migration_handle_shutdown_req(void)
 {
 	return;
 }
+
+void pscom_report_to_migfra(const char *status)
+{
+	return;
+}
 #endif /* _PSCOM_SUPPORT_MIGRATION */
