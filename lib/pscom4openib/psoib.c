@@ -1125,11 +1125,7 @@ int psoib_sendv(psoib_con_info_t *con_info, struct iovec *iov, int size)
 
 void psoib_send_eof(psoib_con_info_t *con_info)
 {
-//	_psoib_sendv(con_info, NULL, 0, PSOIB_MAGIC_EOF);
-	while (con_info->outstanding_cq_entries) {
-		psoib_poll(&default_hca, 1);
-	}
-
+	_psoib_sendv(con_info, NULL, 0, PSOIB_MAGIC_EOF);
 	con_info->con_broken = 1; // Do not send more
 }
 
@@ -1251,7 +1247,7 @@ int psoib_check_cq(hca_info_t *hca_info)
 {
     struct ibv_wc wc;
     int rc;
-	
+
     rc = ibv_poll_cq(hca_info->cq, 1, &wc);
 
     if (rc == 1) {
