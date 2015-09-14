@@ -209,9 +209,6 @@ void pscom_openib_init(void)
 static
 void pscom_openib_destroy(void)
 {
-	/* check for outstanding cq entries */
-	pscom_poll_cq(&pscom_cq_poll);
-
 	/* destroy psoib and remove reader */
 	if (psoib_destroy()) goto err_psoib_destroy;
 	list_del_init(&pscom_cq_poll.next);
