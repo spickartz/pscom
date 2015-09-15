@@ -313,6 +313,12 @@ void pscom_migration_handle_resume_req(void)
 	pscom.migration_state = PSCOM_MIGRATION_RESUMING;
 
 	DPRINT(3, "[%d] ||||||||||||||| MIGRATON COMPLETED ||||||||||||||", getpid());
+
+
+	/* report to migration framework of feedback should not be postponed */
+	if (pscom.env.postpone_feedback == 0) {
+		pscom_report_to_migfra("COMPLETED");
+	}
 }
 
 void pscom_migration_handle_shutdown_req(void)

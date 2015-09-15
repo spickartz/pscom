@@ -568,7 +568,8 @@ void pscom_con_setup_ok(pscom_con_t *con)
 	}
 
 	/* inform MigFra that the connection has been successfully resumed */
-	if ((pscom.migration_state == PSCOM_MIGRATION_RESUMING) && 
+	if ((pscom.env.postpone_feedback == 1) &&
+	    (pscom.migration_state == PSCOM_MIGRATION_RESUMING) && 
 	    !pscom_any_con_in_precon())
 		pscom_report_to_migfra("COMPLETED");
 
