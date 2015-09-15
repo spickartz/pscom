@@ -209,12 +209,12 @@ void pscom_openib_init(void)
 static
 void pscom_openib_destroy(void)
 {
-	/* check for outstanding cq entries */
-	pscom_poll_cq(&pscom_cq_poll);
-
-	/* destroy psoib */
+	/* destroy psoib and remove reader */
 	if (psoib_destroy()) goto err_psoib_destroy;
-	if (!list_empty(&pscom_cq_poll.next)) goto err_outstanding_cq_entries;
+	list_del_init(&pscom_cq_poll.next);
+
+	/* check if there are still outstanding cq entries */	
+	if (psoib_outstanding_cq_entries) goto err_outstanding_cq_entries;
 
 	DPRINT(1, "%s %d: Successfully destroyed OPENIB plugin!", 
 	       __FILE__, __LINE__);

@@ -42,7 +42,7 @@ pscom_str_replace(char *search_str, char *replace_str, char *str)
 	char *tmp_str, *search_start;
 	int str_len = 0;
 
-	/* find search_str in str */ 
+	/* find search_str in str */
 	if ((search_start = strstr(str, search_str)) == NULL) {
 		return -1;
 	}
@@ -392,6 +392,12 @@ void pscom_migration_handle_resume_req(void)
 	pscom.migration_state = PSCOM_MIGRATION_RESUMING;
 
 	DPRINT(3, "[%d] ||||||||||||||| MIGRATON COMPLETED ||||||||||||||", getpid());
+
+
+	/* report to migration framework of feedback should not be postponed */
+	if (pscom.env.postpone_feedback == 0) {
+		pscom_report_to_migfra("COMPLETED");
+	}
 }
 
 void pscom_migration_handle_shutdown_req(void)
@@ -627,6 +633,11 @@ int pscom_migration_cleanup(void)
 	return PSCOM_SUCCESS;
 }
 void pscom_migration_handle_shutdown_req(void)
+{
+	return;
+}
+
+void pscom_report_to_migfra(const char *status)
 {
 	return;
 }

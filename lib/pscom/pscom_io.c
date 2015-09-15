@@ -620,11 +620,6 @@ void pscom_reset_con_to_ondemand(pscom_con_t *con)
 	memcpy(remote_name, connection->remote_con_info.name, 8);
 
 	/* close the connection */
-	while (!list_empty(&con->sendq)) {
-		con->write_start(con);
-		pscom_test_any();
-	}
-
 	con->close(con);
 	list_del_init(&con->next);
 
