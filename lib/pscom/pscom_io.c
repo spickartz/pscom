@@ -34,7 +34,6 @@ static        void         genreq_merge_header(pscom_req_t *newreq, pscom_req_t 
 static        void         _genreq_merge(pscom_req_t *newreq, pscom_req_t *genreq);
 static        pscom_req_t *pscom_get_default_recv_req(pscom_con_t *con, pscom_header_net_t *nh);
 static inline pscom_req_t *_pscom_get_user_receiver(pscom_con_t *con, pscom_header_net_t *nh);
-inline	      pscom_req_t *_pscom_get_ctrl_receiver(pscom_con_t *con, pscom_header_net_t *nh);
 static        pscom_req_t *pscom_get_rma_write_receiver(pscom_con_t *con, pscom_header_net_t *nh);
 static        pscom_req_t *_pscom_get_rma_read_receiver(pscom_con_t *con, pscom_header_net_t *nh);
 static        pscom_req_t *_pscom_get_rma_read_answer_receiver(pscom_con_t *con, pscom_header_net_t *nh);
@@ -51,7 +50,8 @@ static        void         _pscom_send(pscom_con_t *con, unsigned msg_type,
 static        void         pscom_send_inplace_io_done(pscom_request_t *req);
 static        int          _pscom_cancel_send(pscom_req_t *req);
 static        int          _pscom_cancel_recv(pscom_req_t *req);
-inline        void         pscom_post_send_direct(pscom_req_t *req, unsigned msg_type);
+static inline void         pscom_post_send_direct_inline(pscom_req_t *req, unsigned msg_type);
+static inline void         _pscom_post_send_direct(pscom_con_t *con, pscom_req_t *req, unsigned msg_type);
 static inline void         pscom_post_send_rendezvous(pscom_req_t *user_req);
 static inline void         _pscom_post_rma_read(pscom_req_t *req);
 
@@ -340,7 +340,6 @@ pscom_req_t *_pscom_get_user_receiver(pscom_con_t *con, pscom_header_net_t *nh)
 }
 
 
-inline
 pscom_req_t *_pscom_get_ctrl_receiver(pscom_con_t *con, pscom_header_net_t *nh)
 {
 	pscom_req_t *req;
@@ -1056,6 +1055,41 @@ void pscom_write_pending_done(pscom_con_t *con, pscom_req_t *req)
 }
 
 
+/* Use con to send req with msg_type. pscom_lock must be held. */
+static inline
+void _pscom_post_send_direct(pscom_con_t *con, pscom_req_t *req, unsigned msg_type)
+{
+	pscom_req_prepare_send(req, msg_type); // build header and iovec
+	req->pub.connection = &con->pub;
+
+	D_TR(printf("%s:%u:%s(%s)\n", __FILE__, __LINE__, __func__,
+		    pscom_debug_req_str(req)));
+
+	_pscom_sendq_enq(con, req);
+}
+
+
+/* inline version of pscom_post_send_direct */
+static inline
+void pscom_post_send_direct_inline(pscom_req_t *req, unsigned msg_type)
+{
+	pscom_req_prepare_send(req, msg_type); // build header and iovec
+
+	D_TR(printf("%s:%u:%s(%s)\n", __FILE__, __LINE__, __func__,
+		    pscom_debug_req_str(req)));
+
+	pscom_lock(); {
+		_pscom_sendq_enq(get_con(req->pub.connection), req);
+	} pscom_unlock();
+}
+
+
+/* _pscom_post_send_direct version, but pscom_lock NOT held. */
+void pscom_post_send_direct(pscom_req_t *req, unsigned msg_type)
+{
+	pscom_post_send_direct_inline(req, msg_type);
+}
+
 static
 void _pscom_send(pscom_con_t *con, unsigned msg_type,
 		 void *xheader, unsigned xheader_len,
@@ -1171,19 +1205,6 @@ int _pscom_cancel_recv(pscom_req_t *req)
 	_pscom_recv_req_done(req); // done
 
 	return 1;
-}
-
-
-inline
-void pscom_post_send_direct(pscom_req_t *req, unsigned msg_type)
-{
-	pscom_req_prepare_send(req, msg_type); // build header and iovec
-
-	D_TR(printf("%s(req:%p,%s)\n", __func__, req, pscom_req_state_str(req->pub.state)));
-
-	pscom_lock(); {
-		_pscom_sendq_enq(get_con(req->pub.connection), req);
-	} pscom_unlock();
 }
 
 
@@ -1527,8 +1548,8 @@ void pscom_post_send(pscom_request_t *request)
 	assert(request->connection != NULL);
 
 	if (req->pub.data_len < get_con(request->connection)->rendezvous_size) {
-		// printf("Send s %d\n", request->data_len);
-		pscom_post_send_direct(req, PSCOM_MSGTYPE_USER);
+		perf_add("reset_send_direct");
+		pscom_post_send_direct_inline(req, PSCOM_MSGTYPE_USER);
 	} else {
 		// printf("Send r %d\n", request->data_len);
 		pscom_post_send_rendezvous(req);
