@@ -32,6 +32,7 @@ typedef struct {
 static unsigned pscom_precon_count = 0;
 
 static void pscom_precon_recv_stop(precon_t *pre);
+static void pscom_precon_check_end(precon_t *pre);
 
 
 static
@@ -109,6 +110,8 @@ void pscom_precon_print_stat(precon_t *pre)
 {
 	int fd = pre->ufd_info.fd;
 	char state[10] = "no fd";
+	assert(pre->magic == MAGIC_PRECON);
+
 	if (fd != -1) {
 		struct pollfd *pollfd = ufd_get_pollfd(&pscom.ufd, &pre->ufd_info);
 		if (pollfd) {
@@ -222,6 +225,7 @@ int _pscom_tcp_connect(int nodeid, int portno, void *debug_id)
 {
 	struct sockaddr_in si;
 	int rc;
+	int optval;
 
 	/* Open the socket */
 	int fd = socket(PF_INET , SOCK_STREAM, 0);
@@ -229,6 +233,13 @@ int _pscom_tcp_connect(int nodeid, int portno, void *debug_id)
 
 	/* Try a nonblocking connect. Ignoring fcntl errors and use blocking connect in this case. */
 	fcntl(fd, F_SETFL, O_NONBLOCK);
+
+	/* Close on exec. Ignore errors. */
+	fcntl(fd, F_SETFD, FD_CLOEXEC);
+
+	/* Enable keep alive. Ignore errors. */
+	optval = 1;
+	setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
 
 	pscom_sockaddr_init(&si, nodeid, portno);
 
@@ -296,6 +307,8 @@ const char *pscom_precon_str(precon_t *pre)
 static
 void pscom_precon_terminate(precon_t *pre)
 {
+	assert(pre->magic == MAGIC_PRECON);
+
 	DPRINT(1, "precon(%p): terminated", pre);
 	pscom_precon_recv_stop(pre);
 	// trow away the sendbuffer
@@ -370,13 +383,16 @@ void pscom_precon_handle_receive(precon_t *pre, uint32_t type, void *data, unsig
 		break;
 	case PSCOM_INFO_FD_ERROR:
 		if (pre->plugin && con) pre->plugin->con_handshake(con, PSCOM_INFO_ARCH_NEXT, NULL, 0);
-		if (con) pscom_con_setup_failed(con, PSCOM_ERR_IOERROR);
+		if (con) {
+			int err = data ? *(int*)data : 0;
+			pscom_con_setup_failed(con, err == ECONNREFUSED ? PSCOM_ERR_CONNECTION_REFUSED : PSCOM_ERR_IOERROR);
+		}
 		pscom_precon_terminate(pre);
 		break;
 	case PSCOM_INFO_CON_INFO: {
 		pscom_info_con_info_t *msg = data;
 		if (size != sizeof(*msg)) { // old pscom version send CON_INFO before VERSION.
-			return;
+			break;
 		}
 		pscom_sock_t *sock = pre->sock;
 
@@ -410,7 +426,8 @@ void pscom_precon_handle_receive(precon_t *pre, uint32_t type, void *data, unsig
 			assert(!con->precon);
 			con->precon = pre;
 			con->pub.remote_con_info = msg->con_info;
-			con->pub.state = PSCOM_CON_STATE_ACCEPTING;
+			con->pub.state = PSCOM_CON_STATE_ACCEPTING_ONDEMAND;
+
 			pscom_precon_send_PSCOM_INFO_VERSION(pre);
 			pscom_precon_send_PSCOM_INFO_CON_INFO(pre, PSCOM_INFO_CON_INFO);
 		} else {
@@ -431,7 +448,6 @@ void pscom_precon_handle_receive(precon_t *pre, uint32_t type, void *data, unsig
 			errno = EPROTO;
 			if (con) pscom_con_setup_failed(con, PSCOM_ERR_STDERROR);
 			pscom_precon_terminate(pre);
-			return;
 		}
 		break;
 	}
@@ -509,6 +525,7 @@ void pscom_precon_handle_receive(precon_t *pre, uint32_t type, void *data, unsig
 	default: /* ignore all unknown info messages */
 		;
 	}
+	pscom_precon_check_end(pre);
 }
 
 
@@ -540,18 +557,32 @@ void pscom_precon_destroy(precon_t *pre)
 
 
 static
+int pscom_precon_isconnected(precon_t *pre) {
+	return pre->ufd_info.fd >= 0;
+}
+
+
+static
+void pscom_precon_connect_terminate(precon_t *pre) {
+	assert(pre->magic == MAGIC_PRECON);
+
+	if (!pscom_precon_isconnected(pre)) return;
+
+	close(pre->ufd_info.fd);
+	ufd_del(&pscom.ufd, &pre->ufd_info);
+	pre->ufd_info.fd = -1;
+}
+
+
+static
 void pscom_precon_reconnect(precon_t *pre)
 {
 	assert(pre->magic == MAGIC_PRECON);
-	if (pre->ufd_info.fd >= 0) {
-		close(pre->ufd_info.fd);
-		ufd_del(&pscom.ufd, &pre->ufd_info);
-		pre->ufd_info.fd = -1;
-	}
+
+	pscom_precon_connect_terminate(pre);
 
 	if (pre->reconnect_cnt < pscom.env.retry) {
 		pre->reconnect_cnt++;
-		sleep(1); // ToDo: Avoid blocking sleep!
 		DPRINT(1, "precon(%p):pscom_precon_reconnect count %u",
 		       pre, pre->reconnect_cnt);
 		int fd = _pscom_tcp_connect(pre->nodeid, pre->portno, pre);
@@ -707,7 +738,6 @@ void pscom_precon_do_read(ufd_t *ufd, ufd_funcinfo_t *ufd_info)
 			pre->recv = NULL;
 			pre->recv_len = 0;
 			pscom_precon_handle_receive(pre, ntype, msg + header_size, nsize);
-			pscom_precon_check_end(pre);
 			/* Dont use pre hereafter, as handle_receive may free it! */
 
 			pre = NULL;
@@ -726,7 +756,9 @@ check_read_error:
 		return;
 	} else if (errno == ECONNREFUSED) {
 		DPRINT(3, "precon(%p): read(%d,...) : %s", pre, fd, strerror(errno));
-		pscom_precon_reconnect(pre);
+		/* pscom_precon_reconnect(pre); */
+		/* Terminate this connection. Reconnect after pscom.env.precon_reconnect_timeout.*/
+		pscom_precon_connect_terminate(pre);
 	} else {
 		/* Connection error. Handle the pseudo message FD_ERROR. */
 		int error_code = errno;
@@ -829,11 +861,29 @@ int pscom_precon_do_read_poll(pscom_poll_reader_t *reader)
 	assert(pre->magic == MAGIC_PRECON);
 	unsigned long now = getusec();
 
-	if (now - pre->last_poll > 500 /* ms */ * 1000) {
-		pre->last_poll = now;
-		pre->stat_poll_cnt++;
+	if (pscom.env.debug >= PRECON_LL) {
+		if (now - pre->last_print_stat > 500 /* ms */ * 1000) {
+			pre->stat_poll_cnt++;
 
-		pscom_precon_print_stat(pre);
+			pre->last_print_stat = now;
+			pscom_precon_print_stat(pre);
+		}
+	}
+
+	if (now - pre->last_reconnect > pscom.env.precon_reconnect_timeout /* ms */ * 1000UL) {
+		pre->last_reconnect = now;
+
+		if (!pscom_precon_isconnected(pre) || (pre->stat_recv == 0)) {
+			if (pscom_precon_isconnected(pre) && (pre->stat_recv == 0)) {
+				/* ToDo:
+				   If the peer is just busy, we should wait further, but if
+				   this connection is broken we should reconnect. How to detect that
+				   the remote missed the accept event? */
+				DPRINT(3, "precon(%p): connection stalled", pre);
+			} else {
+				pscom_precon_reconnect(pre);
+			}
+		}
 	}
 
 	return 0;
@@ -856,13 +906,12 @@ precon_t *pscom_precon_create(pscom_con_t *con)
 
 	pre->ufd_info.fd = -1;
 
-	if (pscom.env.debug >= PRECON_LL) {
-		pre->last_poll = getusec();
-		pre->poll_reader.do_read = pscom_precon_do_read_poll;
-		list_add_tail(&pre->poll_reader.next, &pscom.poll_reader);
-	} else {
-		INIT_LIST_HEAD(&pre->poll_reader.next);
-	}
+	pre->last_reconnect =
+		pre->last_print_stat = getusec();
+
+	pre->poll_reader.do_read = pscom_precon_do_read_poll;
+	list_add_tail(&pre->poll_reader.next, &pscom.poll_reader);
+
 	pre->stat_send = 0;
 	pre->stat_recv = 0;
 	pre->stat_poll_cnt = 0;
@@ -880,10 +929,19 @@ void pscom_precon_handshake(precon_t *pre)
 	/* Enable receive */
 	pscom_precon_recv_start(pre);
 
-	if (pre->con && pre->con->pub.state == PSCOM_CON_STATE_CONNECTING) {
-		int on_demand = (pre->con->pub.type == PSCOM_CON_TYPE_ONDEMAND);
-		int type = on_demand ? PSCOM_INFO_CON_INFO_DEMAND : PSCOM_INFO_CON_INFO;
+	// printf("%s:%u:%s CON_STATE:%s\n", __FILE__, __LINE__, __func__,
+	//        pre->con ? pscom_con_state_str(pre->con->pub.state): "no connection");
 
+	if (pre->con && (pre->con->pub.state & PSCOM_CON_STATE_CONNECTING)) {
+		int on_demand = (pre->con->pub.type == PSCOM_CON_TYPE_ONDEMAND);
+		int type;
+		if (on_demand) {
+			type = PSCOM_INFO_CON_INFO_DEMAND;
+			pre->con->pub.state = PSCOM_CON_STATE_CONNECTING_ONDEMAND;
+		} else {
+			type = PSCOM_INFO_CON_INFO;
+			pre->con->pub.state = PSCOM_CON_STATE_CONNECTING;
+		}
 		pscom_precon_send_PSCOM_INFO_VERSION(pre);
 		pscom_precon_send_PSCOM_INFO_CON_INFO(pre, type);
 		plugin_connect_next(pre->con);

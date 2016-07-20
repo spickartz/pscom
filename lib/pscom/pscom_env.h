@@ -48,6 +48,7 @@
 #define ENV_SUSPEND_RESUME "PSP_SUSPEND_RESUME"
 /* Postpone suspend/resume feedback 0: do not postpone, 1: postpone */
 #define ENV_POSTPONE_FEEDBACK "PSP_POSTPONE_FEEDBACK"
+#define ENV_RENDEZVOUS_OPENIB "PSP_RENDEZVOUS_OPENIB"
 
 /* Used in constructing the UUID for QLogic */
 #define ENV_PSM_UNIQ_ID "PSP_PSM_UNIQ_ID"
@@ -55,8 +56,13 @@
 
 /* Debugoutput on signal SIGQUIT (i386:3) (key: ^\) */
 #define ENV_SIGQUIT "PSP_SIGQUIT"
+/* signal number to listen on for connection suspend */
+#define ENV_SIGSUSPEND "PSP_SIGSUSPEND"
 #define ENV_READAHEAD "PSP_READAHEAD"
 #define ENV_RETRY "PSP_RETRY"
+
+/* Enable/Disable the connection guard */
+#define ENV_GUARD "PSP_GUARD"
 
 #define ENV_PLUGINDIR "PSP_PLUGINDIR"
 #define ENV_ARCH_PREFIX "PSP_"
@@ -146,6 +152,7 @@ struct PSCOM_env {
 	unsigned int	so_rcvbuf;
 	int		tcp_nodelay;
 	unsigned int	tcp_backlog;
+	unsigned int	precon_reconnect_timeout;
 	int		unexpected_receives;
 	int		sched_yield;
 	unsigned int	rendezvous_size;
@@ -156,10 +163,13 @@ struct PSCOM_env {
 	unsigned int	rendezvous_size_velo;
 	unsigned int	suspend_resume;
 	unsigned int	postpone_feedback;
+	unsigned int	rendezvous_size_openib;
 	unsigned int	psm_uniq_id;
 	int		sigquit;
+	int		sigsuspend;
 	unsigned int	readahead;
 	unsigned int	retry;
+	unsigned int	guard;
 	unsigned int	skipblocksize;
 	unsigned int	iprobe_count;
 
@@ -178,6 +188,7 @@ struct PSCOM_env {
 	.so_rcvbuf = 32768,						\
 	.tcp_nodelay = 1,						\
 	.tcp_backlog = 262144 /*SOMAXCONN = 128 */,			\
+	.precon_reconnect_timeout = 2000, /* try reconnect in [ms] */	\
 									\
 	.unexpected_receives = 0,					\
 	.sched_yield = 0,						\
@@ -189,11 +200,14 @@ struct PSCOM_env {
 	.rendezvous_size_velo = 1024, /* default rendezvous_size for velo */ \
 	.suspend_resume = 0,						\
 	.postpone_feedback = 0,						\
+	.rendezvous_size_openib = 40000, /* default rendezvous_size for openib */ \
 	.psm_uniq_id = 0,						\
 	.sigquit = 0,							\
+	.sigsuspend = 0,						\
 	.readahead = 100,						\
 	.skipblocksize = 8192,						\
 	.retry = 10,							\
+	.guard = 1,							\
 	.iprobe_count = 0,						\
 									\
 	.network = NULL,						\

@@ -28,6 +28,7 @@
 #include "pscom_p4s.h"
 #include "pscom_gm.h"
 #include "pscom_env.h"
+#include "pscom_precon.h"
 
 #include "pscom_debug.h"
 
@@ -78,41 +79,13 @@ struct PSCOM_req
 	pscom_request_t pub;
 };
 
+struct con_guard {
+	int fd;
+};
 
 typedef struct loopback_conn {
 	int	sending;
 } loopback_conn_t;
-
-
-#define MAGIC_PRECON	0x4a656e73
-typedef struct precon {
-	/* Pre connection data. Used for the initial TCP handshake. */
-	unsigned long	magic;
-	ufd_info_t	ufd_info;
-	unsigned	send_len;	// Length of send
-	unsigned	recv_len;	// Length of recv
-	char		*send;		// Send buffer
-	char		*recv;		// Receive buffer
-
-	int		recv_done : 1;
-	int		closefd_on_cleanup : 1; // Call close(fd) on cleanup?
-
-	int		nodeid, portno; // Retry connect to nodeid:portno on ECONNREFUSED
-	unsigned	reconnect_cnt;
-
-	pscom_con_t	*con;
-	pscom_sock_t	*sock;
-
-	unsigned long		last_poll; // usec of last poll
-	pscom_poll_reader_t	poll_reader; // timeout handling
-
-	unsigned	stat_send;	// bytes send
-	unsigned	stat_recv;	// bytes received
-	unsigned	stat_poll_cnt;	// loops in poll
-
-	/* state information */
-	pscom_plugin_t	*plugin;	// Current plugin.
-} precon_t;
 
 
 typedef struct psib_conn {
@@ -187,8 +160,19 @@ typedef struct pscom_rendezvous_msg {
 		struct {
 			uint64_t /* RMA2_NLA */		rma2_nla; /* Network logical address of the sender */
 		} extoll;
+		struct {
+			uint32_t mr_key;
+			uint64_t mr_addr;
+			int  padding_size;
+			char padding_data[64]; // >= IB_RNDV_PADDING_SIZE (see psoib.h)
+		} openib;
 	}	arch;
 } pscom_rendezvous_msg_t;
+
+static inline
+unsigned pscom_rendezvous_msg_size(unsigned arch_size) {
+	return sizeof(pscom_rendezvous_msg_t) - sizeof(((pscom_rendezvous_msg_t*)0)->arch) + arch_size;
+}
 
 typedef struct pscom_rendezvous_data_shm {
 } pscom_rendezvous_data_shm_t;
@@ -204,6 +188,12 @@ typedef struct _pscom_rendezvous_data_extoll {
 } _pscom_rendezvous_data_extoll_t;
 
 
+typedef struct _pscom_rendezvous_data_openib {
+	/* placeholder for struct pscom_rendezvous_data_openib */
+	char /* struct psiob_rma_req */ _rma_req[128]; /* ??? */
+} _pscom_rendezvous_data_openib_t;
+
+
 typedef struct pscom_rendezvous_data {
 	pscom_rendezvous_msg_t	msg;
 	int	use_arch_read;
@@ -211,6 +201,7 @@ typedef struct pscom_rendezvous_data {
 		pscom_rendezvous_data_shm_t	shm;
 		_pscom_rendezvous_data_dapl_t	dapl;
 		_pscom_rendezvous_data_extoll_t	extoll;
+		_pscom_rendezvous_data_openib_t openib;
 	}		arch;
 } pscom_rendezvous_data_t;
 
@@ -225,6 +216,11 @@ typedef struct pscom_shutdown_msg {
 	} arch;
 #endif
 } pscom_shutdown_msg_t;
+typedef struct pscom_backlog {
+	struct list_head next;
+	void (*call)(void *priv);
+	void *priv;
+} pscom_backlog_t;
 
 
 #define MAGIC_CONNECTION	0x78626c61
@@ -263,11 +259,15 @@ struct PSCOM_con
 	/* return -1 on error.
 	   see _pscom_rendezvous_read_data()  */
 	int (*rma_read)(pscom_req_t *rendezvous_req, pscom_rendezvous_data_t *rd);
+	int (*rma_write)(pscom_con_t *con, void *src, pscom_rendezvous_msg_t *des,
+			 void (*io_done)(void *priv), void *priv);
 
 	precon_t		*precon;	// Pre connection handshake data.
 
 	unsigned int		rendezvous_size;
 	unsigned int		recv_req_cnt;	// count all receive requests on this connection
+
+	uint16_t		suspend_on_demand_portno; // remote listening portno on suspended connections
 
 	struct list_head	sendq;		// List of pscom_req_t.next
 
@@ -284,6 +284,8 @@ struct PSCOM_con
 
 	pscom_poll_reader_t	poll_reader;
 	struct list_head	poll_next_send; // used by pscom.poll_sender
+
+	struct con_guard	con_guard; // connection guard
 
 	struct {
 		pscom_req_t	*req;
@@ -316,6 +318,7 @@ struct PSCOM_con
 	struct {
 		int		eof_received : 1;
 		int		close_called : 1;
+		int		suspend_active : 1;
 	}			state;
 
 	pscom_connection_t	pub;
@@ -346,6 +349,9 @@ struct PSCOM_sock
 
 	unsigned int		recv_req_cnt_any; // count all ANY_SOURCE receive requests on this socket
 
+	struct list_head	pendingioq;	// List of pscom_req_t.next, requests with pending io
+
+	struct list_head	sendq_suspending;// List of pscom_req_t.next, requests from suspending connections
 
 	uint64_t		con_type_mask;	/* allowed con_types.
 						   Or'd value from: (1 << (pscom_con_type_t) con_type)
@@ -400,6 +406,9 @@ struct PSCOM
 
 	struct list_head	poll_reader;	// List of pscom_poll_reader_t.next
 	struct list_head	poll_sender;	// List of pscom_con_t.poll_next_send
+	struct list_head	backlog;	// List of pscom_backlog_t.next
+
+	pthread_mutex_t		backlog_lock;	// Lock for backlog
 
 	struct PSCOM_env	env;
 
@@ -474,6 +483,7 @@ extern pscom_t pscom;
 #define PSCOM_MSGTYPE_EOF	8
 #define PSCOM_MSGTYPE_SHUTDOWN_REQ	9
 #define PSCOM_MSGTYPE_SHUTDOWN_ACK	10
+#define PSCOM_MSGTYPE_SUSPEND   11	
 
 /*
  * Plugin properties
@@ -575,6 +585,12 @@ void pscom_write_pending_done(pscom_con_t *con, pscom_req_t *req);
 
 void pscom_con_error(pscom_con_t *con, pscom_op_t operation, pscom_err_t error);
 void pscom_con_info(pscom_con_t *con, pscom_con_info_t *con_info);
+
+void _pscom_con_suspend(pscom_con_t *con);
+void _pscom_con_resume(pscom_con_t *con);
+void _pscom_con_suspend_received(pscom_con_t *con, void *xheader, unsigned xheaderlen);
+pscom_err_t _pscom_con_connect_ondemand(pscom_con_t *con,
+					int nodeid, int portno, const char name[8]);
 
 /*
 void _pscom_send(pscom_con_t *con, unsigned msg_type,

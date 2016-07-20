@@ -85,7 +85,6 @@ const char *mpid_msgtype_str(enum MPID_PSP_MSGTYPE msg_type)
 
 #include "perf.c"
 
-static
 const char *pscom_msgtype_str(unsigned msg_type)
 {
 	switch(msg_type) {
@@ -97,6 +96,8 @@ const char *pscom_msgtype_str(unsigned msg_type)
 	case PSCOM_MSGTYPE_RENDEZVOUS_FIN:	return "REN_F";
 	case PSCOM_MSGTYPE_BCAST:		return "BCAST";
 	case PSCOM_MSGTYPE_BARRIER:		return "BARRI";
+	case PSCOM_MSGTYPE_EOF:			return "EOF__";
+	case PSCOM_MSGTYPE_SUSPEND:		return "SUSPE";
 	default:				return "UNKNW";
 	}
 }
@@ -171,8 +172,7 @@ void pscom_dump_requests(FILE *out)
 }
 
 
-static
-void pscom_dump_connection(FILE *out, pscom_con_t *con)
+void pscom_dump_con(FILE *out, pscom_con_t *con)
 {
 	unsigned cnt;
 	fprintf(out, "    con#%p type:%6s state:%8s dest:%s recvcnt:%5d", &con->pub,
@@ -207,7 +207,7 @@ void pscom_dump_connections(FILE *out, pscom_sock_t *sock)
 	fprintf(out, "  Connections:\n");
 	list_for_each(pos, &sock->connections) {
 		pscom_con_t *con = list_entry(pos, pscom_con_t, next);
-		pscom_dump_connection(out, con);
+		pscom_dump_con(out, con);
 	}
 }
 
@@ -235,6 +235,15 @@ void pscom_dump_sockets(FILE *out)
 
 		pscom_dump_socket(out, sock);
 	}
+}
+
+
+void pscom_dump_connection(FILE *out, pscom_connection_t *connection)
+{
+	pscom_con_t *con = get_con(connection);
+	assert(con->magic == MAGIC_CONNECTION);
+
+	pscom_dump_con(out, con);
 }
 
 
@@ -282,6 +291,22 @@ void pscom_sigquit(int sig)
 	fprintf(out, " +++++++++ SIGQUIT START ++++\n");
 	pscom_dump_info(out);
 	fprintf(out, " +++++++++ SIGQUIT END ++++++\n");
+}
+
+
+char *pscom_debug_req_str(pscom_req_t *req)
+{
+	static char buf[sizeof("reqUSER_: XXX(Pgpsdec)done_____")];
+	if (req) {
+		snprintf(buf, sizeof(buf), "req%s: %s%u(%s)",
+			 pscom_msgtype_str(req->pub.header.msg_type),
+			 req->magic == MAGIC_REQUEST ? "" : "!MAGIC",
+			 req->req_no,
+			 pscom_req_state_str(req->pub.state));
+	} else {
+		snprintf(buf, sizeof(buf), "req: NULL");
+	}
+	return buf;
 }
 
 

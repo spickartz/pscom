@@ -17,7 +17,8 @@ SUBDIRS = simul_p4sock examples
 
 noinst_PROGRAMS = p4logd porttest psock_test pscom_test		\
 	   pscom_ondemand pscom_bcast_test pscom_request_create	\
-	   pscom_bcast_pp port_pp pscom_maxcon
+	   pscom_bcast_pp port_pp pscom_maxcon \
+	   pscom_test_fault
 
 check_PROGRAMS = list_test
 
@@ -51,8 +52,10 @@ if PSM_ENABLED
   noinst_PROGRAMS += psm_pp
 endif
 
+bin_PROGRAMS += test_nodes
+
 if PSMGMT_ENABLED
-  bin_PROGRAMS += test_nodes pscp
+  bin_PROGRAMS += pscp
 endif
 
 if DAPL_ENABLED
@@ -131,6 +134,9 @@ pscom_bcast_pp_LDADD = $(libpscom) -lpopt
 pscom_maxcon_SOURCES = pscom_maxcon.c
 pscom_maxcon_LDADD = $(libpscom)
 
+pscom_test_fault_SOURCES = pscom_test_fault.c
+pscom_test_fault_LDADD = $(libpscom) -lpopt
+
 # -- mellanox --
 
 libpsport4mvapi = $(top_builddir)/lib/psport4/libpsport4mvapi.la
@@ -197,9 +203,14 @@ psm_pp_LDADD = -lpsm_infinipath -lpopt
 # -- psmgmt --
 
 test_nodes_SOURCES = test_nodes.c
-test_nodes_CPPFLAGS = $(AM_CPPFLAGS) $(PSMGMT_CPPFLAGS)
+if PSMGMT_ENABLED
+test_nodes_CPPFLAGS = $(AM_CPPFLAGS) $(PSMGMT_CPPFLAGS) -DPSMGMT_ENABLED
 test_nodes_LDFLAGS = $(AM_LDFLAGS) $(PSMGMT_LDFLAGS)
 test_nodes_LDADD = $(libpscom) -lpse -lpsi  -lpopt
+else
+test_nodes_CPPFLAGS = $(AM_CPPFLAGS)
+test_nodes_LDADD = $(libpscom) -lpopt
+endif
 
 pscp_SOURCES = pscp.c  psport_util.c
 pscp_CPPFLAGS = $(AM_CPPFLAGS) $(PSMGMT_CPPFLAGS)
@@ -212,10 +223,11 @@ cppflags_dapl = $(AM_CPPFLAGS) $(DAPL_CPPFLAGS)			\
 	-I$(top_srcdir)/lib/pscom -I$(top_srcdir)/lib/pscom4dapl
 ldflags_dapl = $(AM_LDFLAGS) $(DAPL_LDFLAGS)
 
-dapl_pp_SOURCES = dapl/dapl_pp.c ../lib/pscom4dapl/psdapl.c
+dapl_pp_SOURCES = dapl/dapl_pp.c
 dapl_pp_CPPFLAGS = $(cppflags_dapl)
 dapl_pp_LDFLAGS = $(ldflags_dapl)
 dapl_pp_LDADD = $(top_builddir)/lib/pscom/libperf.la		\
+	$(top_builddir)/lib/pscom4dapl/libpsdapl.la 		\
 	-ldat -lpopt
 
 dapl_pp_lowlevel_SOURCES = dapl/dapl_pp_lowlevel.c
@@ -251,6 +263,7 @@ extoll_one_message_LDADD = -lrma2 -lpopt
 # -- mxm -- 
 
 mxm_pp_SOURCES = mxm/mxm_pp.c
+noinst_HEADERS += mxm/mxm_util.c
 mxm_pp_CPPFLAGS = $(AM_CPPFLAGS) $(MXM_CPPFLAGS)
 mxm_pp_LDFLAGS = $(AM_LDFLAGS) $(MXM_LDFLAGS)
 mxm_pp_LDADD = -lmxm -lpopt
@@ -277,7 +290,7 @@ pscom_memusage_openib_SOURCES = pscom_memusage.c
 pscom_memusage_openib_CPPFLAGS = $(AM_CPPFLAGS) -DOPENIB=1	\
 	-I$(top_srcdir)/lib/pscom -I$(top_srcdir)/lib/pscom4openib
 pscom_memusage_openib_LDFLAGS = $(AM_LDFLAGS) $(OPENIB_LDFLAGS)
-pscom_memusage_openib_LDADD = -libverbs
+pscom_memusage_openib_LDADD = -libverbs $(libpscom)
 
 pscom_memusage_ofed_SOURCES = pscom_memusage.c
 pscom_memusage_ofed_CPPFLAGS = $(AM_CPPFLAGS) -DOFED=1		\

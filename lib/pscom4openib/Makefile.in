@@ -26,6 +26,7 @@
 # Author:       Thomas Moschny <moschny@par-tec.com>
 #
 
+
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -110,7 +111,8 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_compile_flag.m4 \
 	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-DIST_COMMON = $(srcdir)/Makefile.am $(am__DIST_COMMON)
+DIST_COMMON = $(srcdir)/Makefile.am $(noinst_HEADERS) \
+	$(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
@@ -197,6 +199,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+HEADERS = $(noinst_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 # Read a list of newline-separated strings from the standard input,
 # and print each of them once, without duplicates.  Input order is
@@ -377,13 +380,13 @@ AM_CPPFLAGS = -I$(top_srcdir)/include -DLIBDIR=\"$(libdir)\" \
 VC_VERSION = $(shell ${top_srcdir}/scripts/vcversion -r $(top_srcdir) -n)
 sed_verbose = $(sed_verbose_$(V))
 sed_verbose_ = $(sed_verbose_$(AM_DEFAULT_VERBOSITY))
-sed_verbose_0 = @echo "  SED   " $(@F);
+sed_verbose_0 = @echo "  SED     " $(@F);
 chmod_verbose = $(chmod_verbose_$(V))
 chmod_verbose_ = $(chmod_verbose_$(AM_DEFAULT_VERBOSITY))
-chmod_verbose_0 = @echo "  CHMOD " $(@F);
+chmod_verbose_0 = @echo "  CHMOD   " $(@F);
 txt2man_verbose = $(txt2man_verbose_$(V))
 txt2man_verbose_ = $(txt2man_verbose_$(AM_DEFAULT_VERBOSITY))
-txt2man_verbose_0 = @echo "TXT2MAN " $(@F);
+txt2man_verbose_0 = @echo "TXT2MAN   " $(@F);
 do_subst = sed \
 	-e 's,[@]pkgdatadir[@],$(pkgdatadir),g' \
         -e 's,[@]bindir[@],$(bindir),g' \
@@ -398,6 +401,7 @@ TXT2MAN = $(top_srcdir)/scripts/txt2man
 configdir = $(prefix)/config
 lib_LTLIBRARIES = libpscom4openib.la
 libpscom4openib_la_SOURCES = pscom_openib.c pscom_openib.h psoib.c psoib.h
+noinst_HEADERS = psoib_mregion_cache.c
 libpscom4openib_la_CPPFLAGS = $(AM_CPPFLAGS) $(OPENIB_CPPFLAGS)
 libpscom4openib_la_LDFLAGS = $(AM_LDFLAGS) $(OPENIB_LDFLAGS)
 libpscom4openib_la_LIBADD = -libverbs $(top_builddir)/lib/pscom/libpscom.la
@@ -611,7 +615,7 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LTLIBRARIES)
+all-am: Makefile $(LTLIBRARIES) $(HEADERS)
 installdirs:
 	for dir in "$(DESTDIR)$(libdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \

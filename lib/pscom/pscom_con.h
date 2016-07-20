@@ -29,6 +29,8 @@ pscom_con_t *pscom_con_create(pscom_sock_t *sock);
 void pscom_con_terminate_recvq(pscom_con_t *con);
 void pscom_con_close(pscom_con_t *con);
 
+void pscom_con_info_set(pscom_con_t *con, const char *path, const char *val);
+
 // {read,write}_{start,stop} default hook.
 void pscom_no_rw_start_stop(pscom_con_t *con);
 
@@ -42,5 +44,12 @@ void pscom_ondemand_indirect_connect(pscom_con_t *con);
 
 void pscom_con_shutdown(pscom_con_t *con);
 void pscom_con_resume(pscom_con_t *con);
+/* Start the connection guard on con.
+   - con must have an active con->precon
+   - precon->closefd_on_cleanup will be set to false
+   - precon's fd will be monitored for EOF
+*/
+void pscom_con_guard_start(pscom_con_t *con);
+void pscom_con_guard_stop(pscom_con_t *con);
 
 #endif /* _PSCOM_CON_H_ */

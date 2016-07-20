@@ -143,11 +143,17 @@ void pscom_env_init(void)
 	if (pscom.env.unexpected_receives != ~0)
 		pscom.env.unexpected_receives = 1;
 	pscom_env_get_uint(&pscom.env.postpone_feedback, ENV_POSTPONE_FEEDBACK);
+	if (pscom.env.rendezvous_size != (unsigned)~0)
+		pscom.env.rendezvous_size_openib = pscom.env.rendezvous_size;
+	pscom_env_get_uint(&pscom.env.rendezvous_size_openib, ENV_RENDEZVOUS_OPENIB);
 
 	pscom_env_get_int(&pscom.env.sigquit, ENV_SIGQUIT);
+	pscom_env_get_int(&pscom.env.sigsuspend, ENV_SIGSUSPEND);
 	pscom_env_get_uint(&pscom.env.readahead, ENV_READAHEAD);
 	pscom_env_get_uint(&pscom.env.retry, ENV_RETRY);
 	pscom.env.readahead = pscom_max(pscom.env.readahead, sizeof(pscom_header_net_t));
+
+	pscom_env_get_uint(&pscom.env.guard, ENV_GUARD);
 
 	pscom_env_get_str(&pscom.env.network, ENV_NETWORK);
 	pscom_env_get_dir(&pscom.env.plugindir, ENV_PLUGINDIR);

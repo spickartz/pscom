@@ -57,6 +57,7 @@ bin/pscom_ondemand.c \
 bin/pscom_pp.c \
 bin/pscom_request_create.c \
 bin/pscom_test.c \
+bin/pscom_test_fault.c \
 bin/pscp.c \
 bin/psm/psm_pp.c \
 bin/psock_pp.c \
@@ -111,7 +112,10 @@ lib/pscom/getid.c \
 lib/pscom/list.h \
 lib/pscom/perf.c \
 lib/pscom/perf.h \
+lib/pscom/perf.sh \
 lib/pscom/pscom.c \
+lib/pscom/pscom_async.c \
+lib/pscom/pscom_async.h \
 lib/pscom/pscom_con.c \
 lib/pscom/pscom_con.h \
 lib/pscom/pscom_debug.c \
@@ -146,6 +150,7 @@ lib/pscom/pscom_sock.c \
 lib/pscom/pscom_sock.h \
 lib/pscom/pscom_str_util.c \
 lib/pscom/pscom_str_util.h \
+lib/pscom/pscom_suspend.c \
 lib/pscom/pscom_tcp.c \
 lib/pscom/pscom_tcp.h \
 lib/pscom/pscom_types.h \
@@ -198,6 +203,7 @@ lib/pscom4openib/pscom_openib.c \
 lib/pscom4openib/pscom_openib.h \
 lib/pscom4openib/psoib.c \
 lib/pscom4openib/psoib.h \
+lib/pscom4openib/psoib_mregion_cache.c \
 lib/pscom4psm/Makefile.am \
 lib/pscom4psm/Makefile.in \
 lib/pscom4psm/pscom_psm.c \
@@ -265,5 +271,6 @@ scripts/ps_p4sock.sh \
 scripts/rpm_noreq \
 scripts/tcpdump.awk \
 scripts/tcpdumpp4 \
+scripts/test-driver \
 scripts/txt2man \
 scripts/vcversion
