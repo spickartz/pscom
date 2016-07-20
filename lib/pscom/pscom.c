@@ -389,5 +389,3 @@ int pscom_test_any(void)
 
 	return ret;
 }
-
-#include "pscom_migrate.c"
