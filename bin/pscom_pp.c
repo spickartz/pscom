@@ -24,6 +24,7 @@
 #include <popt.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <sched.h>
 
 #include "pscom.h"
 
