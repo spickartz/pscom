@@ -39,7 +39,7 @@ typedef struct {
     struct ibv_mr *mr;
 } mem_info_t;
 
-#define IB_USE_RNDV
+#undef IB_USE_RNDV
 #define IB_RNDV_RDMA_WRITE
 #define IB_RNDV_THRESHOLD 4096
 #define IB_RNDV_USE_MREG_CACHE
