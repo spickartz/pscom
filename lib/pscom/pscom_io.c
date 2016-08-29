@@ -973,6 +973,7 @@ pscom_req_t *_pscom_get_recv_req(pscom_con_t *con, pscom_header_net_t *nh)
 		case PSCOM_MSGTYPE_SHUTDOWN_ACK:
 		case PSCOM_MSGTYPE_SHUTDOWN_REQ:
 			req = pscom_get_shutdown_receiver(con, nh);
+			break;
 		case PSCOM_MSGTYPE_SUSPEND:
 			req = _pscom_get_suspend_receiver(con, nh);
 			break;
