@@ -61,12 +61,6 @@
 static int init_state = 1;
 
 typedef struct {
-    void *ptr;
-    struct ibv_mr *mr;
-} mem_info_t;
-
-
-typedef struct {
     mem_info_t	bufs;
     unsigned	pos; /* current position */
 } ringbuf_t;
