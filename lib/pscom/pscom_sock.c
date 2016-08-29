@@ -270,11 +270,12 @@ retry_listen:
 			goto retry_listen;
 		}
 
-		/* Ensure that we are always listening! (only needed for migration) */
-		pscom_listener_user_inc(&sock->listen);
 
 		goto err_listen;
 	}
+
+	/* Ensure that we are always listening! (only needed for migration) */
+	pscom_listener_user_inc(&sock->listen);
 
 	DPRINT(PRECON_LL, "precon: listen(%d, %d) on port %u", listen_fd,
 	       pscom.env.tcp_backlog, ntohs(sa.sin_port));
