@@ -49,6 +49,7 @@
 /* Postpone suspend/resume feedback 0: do not postpone, 1: postpone */
 #define ENV_POSTPONE_FEEDBACK "PSP_POSTPONE_FEEDBACK"
 #define ENV_RENDEZVOUS_OPENIB "PSP_RENDEZVOUS_OPENIB"
+#define ENV_RENDEZVOUS_UCP "PSP_RENDEZVOUS_UCP"
 
 /* Used in constructing the UUID for QLogic */
 #define ENV_PSM_UNIQ_ID "PSP_PSM_UNIQ_ID"
@@ -164,6 +165,7 @@ struct PSCOM_env {
 	unsigned int	suspend_resume;
 	unsigned int	postpone_feedback;
 	unsigned int	rendezvous_size_openib;
+	unsigned int	rendezvous_size_ucp;
 	unsigned int	psm_uniq_id;
 	int		sigquit;
 	int		sigsuspend;
@@ -201,6 +203,7 @@ struct PSCOM_env {
 	.suspend_resume = 0,						\
 	.postpone_feedback = 0,						\
 	.rendezvous_size_openib = 40000, /* default rendezvous_size for openib */ \
+	.rendezvous_size_ucp = ~0, /* default rendezvous_size for ucp */ \
 	.psm_uniq_id = 0,						\
 	.sigquit = 0,							\
 	.sigsuspend = 0,						\
