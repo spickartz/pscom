@@ -224,7 +224,7 @@ int pscom_extoll_rma_read(pscom_req_t *rendezvous_req, pscom_rendezvous_data_t *
 
 	extoll_rd->rendezvous_req = rendezvous_req;
 
-	return psex_post_rma_get(dreq);
+	return psex_post_rma_gets(dreq);
 }
 
 /* RMA rendezvous end */
@@ -311,9 +311,6 @@ void pscom_extoll_con_close(pscom_con_t *con)
 {
 	psex_con_info_t *ci = con->arch.extoll.ci;
 	if (!ci) return;
-
-	//psex_send_eof(ci);
-	psex_velo2_send_eof(ci);
 
 	pscom_extoll_con_cleanup(con);
 }

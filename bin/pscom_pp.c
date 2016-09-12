@@ -37,10 +37,13 @@ int arg_loops = 1024*1024;
 int arg_maxtime = 3000;
 #define MAX_XHEADER 100
 int arg_xheader = 12;
-int arg_maxmsize = 65536; //4 * 1024 * 1024;
+int arg_maxmsize = 4 * 1024 * 1024;
+int arg_minmsize = 0;
 int arg_run_once = 0;
 int arg_verbose = 0;
 int arg_histo = 0;
+int arg_valloc = 0;
+int arg_verify = 0;
 
 static
 void parse_opt(int argc, char **argv)
@@ -61,15 +64,23 @@ void parse_opt(int argc, char **argv)
 		  &arg_loops , 0, "pp loops", "count" },
 		{ "time"  , 't', POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARG_INT,
 		  &arg_maxtime, 0, "max time", "ms" },
+		{ "minsize"  , 0, POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARG_INT,
+		  &arg_minmsize , 0, "minimal messagesize", "size" },
 		{ "maxsize"  , 0, POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARG_INT,
 		  &arg_maxmsize , 0, "maximal messagesize", "size" },
 		{ "xheader"  , 0, POPT_ARGFLAG_SHOW_DEFAULT | POPT_ARG_INT,
 		  &arg_xheader , 0, "xheader size", "size" },
 
+		{ "valloc"  , 0, POPT_ARGFLAG_OR | POPT_ARG_VAL,
+		  &arg_valloc , 1, "use valloc() instead of malloc for send/receive buffers", NULL },
+
 		{ "histo" , 'i', POPT_ARGFLAG_OR | POPT_ARG_VAL,
 		  &arg_histo, 1, "Measure each ping pong", NULL },
 
-	{ "once" , '1', POPT_ARGFLAG_OR | POPT_ARG_VAL,
+		{ "verify", 'V', POPT_ARGFLAG_OR | POPT_ARG_VAL,
+		  &arg_verify, 1, "verify message content", NULL },
+
+		{ "once" , '1', POPT_ARGFLAG_OR | POPT_ARG_VAL,
 		  &arg_run_once, 1, "stop after one client", NULL },
 
 		{ "verbose"	, 'v', POPT_ARG_NONE,
@@ -138,7 +149,7 @@ void alarm_handler(int signum){
 static
 void run_pp_server(pscom_connection_t *con)
 {
-	void *buf = malloc(arg_maxmsize);
+	void *buf = arg_valloc ? valloc(arg_maxmsize) : malloc(arg_maxmsize);
 	pscom_request_t *req;
 	int i;
 
@@ -146,6 +157,10 @@ void run_pp_server(pscom_connection_t *con)
 
 	for (i = 0; i < MAX_XHEADER; i++) {
 		req->xheader.user[i] = i + 0xe1;
+	}
+
+	if (arg_verbose) {
+		printf("Buffer: buf:%p\n", buf);
 	}
 
 	while (1) {
@@ -189,31 +204,31 @@ void run_pp_server(pscom_connection_t *con)
 
 
 static
-int run_pp_c(pscom_connection_t *con, int msize, int xsize, int loops)
+int pp_loop(pscom_request_t *sreq, pscom_request_t *rreq, unsigned loops)
 {
-	int cnt;
-	void *sbuf = malloc(msize);
-	void *rbuf = malloc(msize);
-	int ret;
-	pscom_request_t *sreq;
-	pscom_request_t *rreq;
-
-	memset(sbuf, 42, msize);
-	memset(rbuf, 42, msize);
-
-	sreq = pscom_request_create(xsize, 0);
-	rreq = pscom_request_create(xsize, 0);
-
-	if (arg_verbose) {
-		for (cnt = 0; cnt < xsize; cnt++) {
-			sreq->xheader.user[cnt] = cnt + 1;
-		}
-	}
-
-	pscom_req_prepare(sreq, con, sbuf, msize, NULL, xsize);
-	pscom_req_prepare(rreq, con, rbuf, msize, NULL, xsize);
-
+	unsigned cnt, i;
 	for (cnt = 0; cnt < loops; cnt++) {
+		pscom_post_send(sreq);
+
+		// printf("SEND %d data :%s\n", msize,
+		//       pscom_dumpstr(sbuf, MIN(msize, 16)));
+		pscom_post_recv(rreq);
+
+		pscom_wait(sreq);
+		pscom_wait(rreq);
+	}
+	return !pscom_req_successful(rreq);
+}
+
+
+static
+int pp_loop_verify(pscom_request_t *sreq, pscom_request_t *rreq, unsigned loops)
+{
+	unsigned cnt, i, err = 0;
+	for (cnt = 0; cnt < loops; cnt++) {
+		for (i = 0; i < sreq->data_len; i++) {
+			((unsigned char *)sreq->data)[i] = cnt + i;
+		}
 		pscom_post_send(sreq);
 
 		// printf("SEND %d data :%s\n", msize,
@@ -223,46 +238,30 @@ int run_pp_c(pscom_connection_t *con, int msize, int xsize, int loops)
 
 		pscom_wait(sreq);
 		pscom_wait(rreq);
+
+		if (rreq->data_len != sreq->data_len) {
+			printf("Corrupted data_len in msg %u! (recv:%5u != send:%5u)\n",
+			       cnt, rreq->data_len, sreq->data_len);
+			err = 1;
+		}
+		for (i = 0; i < rreq->data_len; i++) {
+			if (((unsigned char *)rreq->data)[i] != (unsigned char)(cnt + i)) {
+				printf("Corrupted byte #%u in msg %u! (is:%3u != should:%3u)\n",
+				       i, cnt, ((unsigned char *)rreq->data)[i], (unsigned char)(cnt + i));
+				err = 1;
+			};
+		}
 	}
-
-	ret = !pscom_req_successful(rreq);
-	pscom_request_free(sreq);
-	pscom_request_free(rreq);
-	free(sbuf);
-	free(rbuf);
-
-	return ret;
+	return !pscom_req_successful(rreq) || err;
 }
 
 
 static
-int run_pp_c_histo(pscom_connection_t *con, int msize, int xsize, int loops)
+int pp_loop_histo(pscom_request_t *sreq, pscom_request_t *rreq, unsigned loops)
 {
-	int cnt;
-	void *sbuf = malloc(msize);
-	void *rbuf = malloc(msize);
+	unsigned cnt, i;
+	unsigned msize = sreq->data_len;
 	unsigned long *time = malloc(sizeof(*time) * loops + 1);
-
-	int ret;
-	pscom_request_t *sreq;
-	pscom_request_t *rreq;
-
-	memset(sbuf, 42, msize);
-	memset(rbuf, 42, msize);
-	memset(time, 1, sizeof(*time) * loops);
-
-	sreq = pscom_request_create(xsize, 0);
-	rreq = pscom_request_create(xsize, 0);
-
-	if (arg_verbose) {
-		for (cnt = 0; cnt < xsize; cnt++) {
-			sreq->xheader.user[cnt] = cnt + 1;
-		}
-	}
-
-	pscom_req_prepare(sreq, con, sbuf, msize, NULL, xsize);
-	pscom_req_prepare(rreq, con, rbuf, msize, NULL, xsize);
-
 	for (cnt = 0; cnt < loops; cnt++) {
 		time[cnt] = getusec();
 		pscom_post_send(sreq);
@@ -279,11 +278,42 @@ int run_pp_c_histo(pscom_connection_t *con, int msize, int xsize, int loops)
 		printf("%5d %8.1f\n", cnt, (time[cnt] - time[cnt - 1]) / 2.0);
 	}
 	fflush(stdout);
+	free(time);
+	return !pscom_req_successful(rreq);
+}
+
+
+static
+int run_pp_c(pscom_connection_t *con, int msize, int xsize, unsigned loops,
+	     int (*pp_loop)(pscom_request_t *sreq, pscom_request_t *rreq, unsigned loops))
+{
+	int cnt;
+	void *sbuf = arg_valloc ? valloc(msize) : malloc(msize);
+	void *rbuf = arg_valloc ? valloc(msize) : malloc(msize);
+	int ret;
+	pscom_request_t *sreq;
+	pscom_request_t *rreq;
+
+	memset(sbuf, 42, msize);
+	memset(rbuf, 42, msize);
+
+	sreq = pscom_request_create(xsize, 0);
+	rreq = pscom_request_create(xsize, 0);
+
+	if (arg_verbose) {
+		printf("Buffers: sbuf:%p rbuf:%p\n", sbuf, rbuf);
+		for (cnt = 0; cnt < xsize; cnt++) {
+			sreq->xheader.user[cnt] = cnt + 1;
+		}
+	}
+
+	pscom_req_prepare(sreq, con, sbuf, msize, NULL, xsize);
+	pscom_req_prepare(rreq, con, rbuf, msize, NULL, xsize);
+
+	ret = pp_loop(sreq, rreq, loops);
 
 	pscom_request_free(sreq);
 	pscom_request_free(rreq);
-	ret = !pscom_req_successful(rreq);
-	free(time);
 	free(sbuf);
 	free(rbuf);
 
@@ -301,18 +331,19 @@ void do_pp_client(pscom_connection_t *con)
 	double ms;
 	int res;
 	double loops = arg_loops;
+	int (*pp_loop_func)(pscom_request_t *sreq, pscom_request_t *rreq, unsigned loops);
 
 	if (arg_xheader > MAX_XHEADER) arg_xheader = MAX_XHEADER;
 
 	printf("Xheader : %d bytes\n", arg_xheader);
 	printf("%7s %8s %8s %8s\n", "msize", "loops", "time", "throughput");
 	printf("%7s %8s %8s %8s\n", "[bytes]", "[cnt]", "[us/cnt]", "[MB/s]");
-	for (ms = 1.4142135; (int)(ms + 0.5) <= arg_maxmsize; ms = ms * 1.4142135) {
+	for (ms = arg_minmsize; (int)(ms + 0.5) <= arg_maxmsize; ms = ms < 2.0 ? ms + 1 : ms * 1.4142135623730950488) {
 		unsigned int iloops = loops;
 		msgsize = ms + 0.5;
 
 		/* warmup, for sync */
-		run_pp_c(con, 2, 2, 2);
+		run_pp_c(con, 2, 2, 2, pp_loop);
 
 #if 0
 		if(msgsize == 1024) {
@@ -323,24 +354,26 @@ void do_pp_client(pscom_connection_t *con)
 			alarm(2);
 		}
 #endif
-
-		if (!arg_histo) {
-			t1 = getusec();
-			res = run_pp_c(con, msgsize, arg_xheader, iloops);
-			t2 = getusec();
+		if (arg_verify) {
+			pp_loop_func = pp_loop_verify;
+		} else if (arg_histo) {
+			pp_loop_func = pp_loop_histo;
 		} else {
-			t1 = getusec();
-			res = run_pp_c_histo(con, msgsize, arg_xheader, iloops);
-			t2 = getusec();
+			pp_loop_func = pp_loop;
 		}
+
+		t1 = getusec();
+		res = run_pp_c(con, msgsize, arg_xheader, iloops, pp_loop_func);
+		t2 = getusec();
 
 		time = (double)(t2 - t1) / (iloops * 2);
 		throuput = msgsize / time;
 		if (res == 0) {
-			printf("%7d %8d %8.2f %8.2f\n", msgsize, iloops, time, throuput);
+			printf("%7d %8d %8.2f %8.2f%s\n", msgsize, iloops, time, throuput,
+			       pp_loop_func == pp_loop_verify ? " ok" : "");
 			fflush(stdout);
 		} else {
-			printf("Error in communication...\n");
+			printf("%7d Error in communication...\n", msgsize);
 		}
 
 		if(0)

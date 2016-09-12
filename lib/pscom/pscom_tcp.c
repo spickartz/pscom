@@ -58,7 +58,7 @@ err_con_broken:
 static
 void tcp_write_stop(pscom_con_t *con)
 {
-	D_TR(printf("write stop tcp\n"));
+	D_TR(printf("%s:%u:%s() write stop tcp\n", __FILE__, __LINE__, __func__));
 	ufd_event_clr(&pscom.ufd, &con->arch.tcp.ufd_info, POLLOUT);
 }
 
@@ -73,6 +73,7 @@ void _tcp_do_write(pscom_con_t *con)
 	req = pscom_write_get_iov(con, iov);
 
 	if (req) {
+		assert(req->magic == MAGIC_REQUEST);
 		ssize_t len;
 		// len = writev(con->arch.tcp.con_fd,
 		//		con->out.iov, con->out.count);
@@ -110,7 +111,7 @@ void tcp_do_write(ufd_t *ufd, ufd_funcinfo_t *ufd_info)
 static
 void tcp_write_start(pscom_con_t *con)
 {
-	D_TR(printf("write start tcp\n"));
+	D_TR(printf("%s:%u:%s() write start tcp\n", __FILE__, __LINE__, __func__));
 
 	/* only send if con is not suspended */
 	if(!con->write_is_suspended) {
@@ -128,10 +129,17 @@ void tcp_write_start(pscom_con_t *con)
 static
 void tcp_read_start(pscom_con_t *con)
 {
-	/* only recv if con is not suspended */
-	if(!con->read_is_suspended) {
-		D_TR(printf("read start tcp\n"));
-		ufd_event_set(&pscom.ufd, &con->arch.tcp.ufd_info, POLLIN);
+	/* was there a shutdown request? */
+	if (pscom.env.suspend_resume &&
+	    pscom.migration_state == PSCOM_MIGRATION_REQUESTED) {
+		pscom_migration_handle_shutdown_req();
+
+	} else {
+		/* only recv if con is not suspended */
+		if(!con->read_is_suspended) {
+			D_TR(printf("%s:%u:%s() read start tcp\n", __FILE__, __LINE__, __func__));
+			ufd_event_set(&pscom.ufd, &con->arch.tcp.ufd_info, POLLIN);
+		}
 	}
 	
 	/* ensure to recv on resume of the connection */
@@ -142,7 +150,7 @@ void tcp_read_start(pscom_con_t *con)
 static
 void tcp_read_stop(pscom_con_t *con)
 {
-	D_TR(printf("read stop tcp\n"));
+	D_TR(printf("%s:%u:%s() read stop tcp\n", __FILE__, __LINE__, __func__));
 	ufd_event_clr(&pscom.ufd, &con->arch.tcp.ufd_info, POLLIN);
 }
 

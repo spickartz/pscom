@@ -39,18 +39,6 @@
 #endif
 
 
-/* Somewhere in the middle of the GCC 2.96 development cycle, we implemented
-   a mechanism by which the user can annotate likely branch directions and
-   expect the blocks to be reordered appropriately.  Define __builtin_expect
-   to nothing for earlier compilers.  */
-#if __GNUC__ == 2 && __GNUC_MINOR__ < 96
-#define __builtin_expect(x, expected_value) (x)
-#endif
-
-#define likely(x)	__builtin_expect((x),1)
-#define unlikely(x)	__builtin_expect((x),0)
-
-
 static
 unsigned shm_direct = 400;
 
@@ -74,16 +62,16 @@ struct shm_direct_header {
 static
 void shm_init_direct(shm_conn_t *shm, int shmid, void *remote_base)
 {
-       if (shmid == -1) {
-               shm->direct_offset = 0;
-               shm->direct_base = NULL;
-               return;
-       }
-       void *buf = shmat(shmid, 0, SHM_RDONLY);
-       assert(buf != (void *) -1 && buf);
+	if (shmid == -1) {
+		shm->direct_offset = 0;
+		shm->direct_base = NULL;
+		return;
+	}
+	void *buf = shmat(shmid, 0, SHM_RDONLY);
+	assert(buf != (void *) -1 && buf);
 
-       shm->direct_base = buf;
-       shm->direct_offset = (char *)buf - (char *)remote_base;
+	shm->direct_base = buf;
+	shm->direct_offset = (char *)buf - (char *)remote_base;
 }
 
 static
@@ -367,7 +355,10 @@ static
 void shm_check_pending_io(shm_conn_t *shm)
 {
 	struct shm_pending *sp;
-	while (((sp = shm->shm_pending)) && sp->msg->msg_type == SHM_MSGTYPE_DIRECT_DONE) {
+	while (((sp = shm->shm_pending)) && (
+		       (sp->msg->msg_type == SHM_MSGTYPE_DIRECT_DONE) ||
+		       (sp->req && (sp->req->pub.state & PSCOM_REQ_STATE_ERROR))
+	       )) {
 		// finish request
 		if (sp->req) pscom_write_pending_done(sp->con, sp->req); // direct send done
 		if (sp->data) free(sp->data); // indirect send done
@@ -542,15 +533,9 @@ void shm_close(pscom_con_t *con)
 		int i;
 		shm_conn_t *shm = &con->arch.shm;
 
-		for (i = 0; i < 5; i++) {
-			// ToDo: Unreliable EOF
-			if (shm_cansend(shm)) {
-				shm_send(shm, NULL, 0);
-				break;
-			} else {
-				usleep(5*1000);
-				sched_yield();
-			}
+		// ToDo: This must not be a blocking while loop!
+		while (shm->shm_pending) {
+			shm_check_pending_io(shm);
 		}
 
 		shm_cleanup_shm_conn(shm);
@@ -649,6 +634,10 @@ void pscom_shm_handshake(pscom_con_t *con, int type, void *data, unsigned size)
 	case PSCOM_INFO_ARCH_NEXT:
 		/* Cleanup shm */
 		shm_cleanup_shm_conn(shm);
+		break;
+
+	case PSCOM_INFO_ARCH_OK:
+		pscom_con_guard_start(con);
 		break;
 	case PSCOM_INFO_EOF:
 		shm_init_con(con);

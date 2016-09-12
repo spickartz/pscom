@@ -18,6 +18,7 @@
 #include "pscom_precon.h"
 #include "pscom_migrate.h"
 #include "pscom_plugin.h"
+#include "pscom_async.h"
 #include "pslib.h"
 #include <unistd.h>
 #include <fcntl.h>
@@ -28,7 +29,6 @@
 static
 void _pscom_con_destroy(pscom_con_t *con);
 
-static
 void pscom_con_info_set(pscom_con_t *con, const char *path, const char *val)
 {
 	char buf[80];
@@ -48,6 +48,10 @@ void pscom_no_rw_start_stop(pscom_con_t *con)
 static
 void _pscom_con_terminate_sendq(pscom_con_t *con)
 {
+	pscom_sock_t *sock = get_sock(con->pub.socket);
+	struct list_head *pos, *next;
+
+	// Sendq
 	while (!list_empty(&con->sendq)) {
 		pscom_req_t *req = list_entry(con->sendq.next, pscom_req_t, next);
 
@@ -55,6 +59,27 @@ void _pscom_con_terminate_sendq(pscom_con_t *con)
 
 		req->pub.state |= PSCOM_REQ_STATE_ERROR;
 		_pscom_send_req_done(req); // done
+	}
+
+	// PendingIO queue
+	list_for_each_safe(pos, next, &sock->pendingioq) {
+		pscom_req_t *req = list_entry(pos, pscom_req_t, next);
+
+		if (req->pub.connection == &con->pub) {
+			req->pub.state |= PSCOM_REQ_STATE_ERROR;
+		}
+	}
+
+	// Connection suspending? Terminate send requests from sock->sendq_suspending.
+	list_for_each_safe(pos, next, &sock->sendq_suspending) {
+		pscom_req_t *req = list_entry(pos, pscom_req_t, next);
+
+		if (req->pub.connection == &con->pub) {
+			list_del(&req->next); // dequeue
+
+			req->pub.state |= PSCOM_REQ_STATE_ERROR;
+			_pscom_send_req_done(req); // done
+		}
 	}
 }
 
@@ -174,8 +199,8 @@ void _pscom_con_cleanup(pscom_con_t *con)
 {
 	assert(con->magic == MAGIC_CONNECTION);
 	if (con->pub.state != PSCOM_CON_STATE_CLOSED) {
-		D_TR(printf("pscom_con_close(con:%p) : state: %s\n", con,
-			    pscom_con_state_str(con->pub.state)));
+		D_TR(printf("%s:%u:%s(con:%p) : state: %s\n", __FILE__, __LINE__, __func__,
+			    con, pscom_con_state_str(con->pub.state)));
 	retry:
 		pscom_con_end_write(con);
 		pscom_con_end_read(con);
@@ -200,7 +225,8 @@ void _pscom_con_cleanup(pscom_con_t *con)
 		    con->in.req) goto retry; // in the case the io_doneq callbacks post more work
 
 		if (con->pub.state == PSCOM_CON_STATE_CLOSING) {
-			DPRINT(1, "DISCONNECT %s via %s",
+			DPRINT(con->pub.type != PSCOM_CON_TYPE_ONDEMAND ? 2 : 5,
+			       "DISCONNECT %s via %s",
 			       pscom_con_str(&con->pub),
 			       pscom_con_type_str(con->pub.type));
 		} else {
@@ -262,6 +288,8 @@ void pscom_con_close(pscom_con_t *con)
 
 	send_eof = ((con->pub.state & PSCOM_CON_STATE_W) == PSCOM_CON_STATE_W) && (con->pub.type != PSCOM_CON_TYPE_ONDEMAND);
 
+	// ToDo: What to do, if (con->pub.state & PSCOM_CON_STATE_SUSPENDING) ?
+
 	if (send_eof) {
 		pscom_con_send_eof(con);
 		con->write_start = _write_start_closing; // No further writes
@@ -313,6 +341,7 @@ void pscom_con_error(pscom_con_t *con, pscom_op_t operation, pscom_err_t error)
 		pscom_con_error_write_failed(con, error);
 		break;
 	case PSCOM_OP_CONNECT:
+	case PSCOM_OP_RW:
 		pscom_con_error_write_failed(con, error);
 		pscom_con_error_read_failed(con, error);
 		break;
@@ -358,6 +387,7 @@ pscom_con_t *pscom_con_create(pscom_sock_t *sock)
 	INIT_LIST_HEAD(&con->poll_reader.next);
 	INIT_LIST_HEAD(&con->poll_next_send);
 
+	con->con_guard.fd = -1;
 	con->precon = NULL;
 	con->in.req	= 0;
 	con->in.req_locked = 0;
@@ -399,6 +429,7 @@ pscom_con_t *pscom_con_create(pscom_sock_t *sock)
 	/* State */
 	con->state.eof_received = 0;
 	con->state.close_called = 0;
+	con->state.suspend_active = 0;
 
 	return con;
 }
@@ -418,6 +449,10 @@ void _pscom_con_destroy(pscom_con_t *con)
 
 	if(con->in.readahead.iov_base) {
 		free(con->in.readahead.iov_base);
+	}
+
+	if (con->con_guard.fd != -1) {
+		pscom_con_guard_stop(con);
 	}
 
 	con->magic = 0;
@@ -465,12 +500,12 @@ int pscom_is_valid_con(pscom_con_t *con)
 			pscom_con_t *con2 = list_entry(pos_con, pscom_con_t, next);
 
 			if (con2 == con) {
-				D_TR(printf("pscom_is_valid_con(%p) = 1\n", con));
+				D_TR(printf("%s:%u:%s(%p) = 1\n", __FILE__, __LINE__, __func__, con));
 				return 1;
 			}
 		}
 	}
-	D_TR(printf("pscom_is_valid_con(%p) = 0\n", con));
+	D_TR(printf("%s:%u:%s(%p) = 0\n", __FILE__, __LINE__, __func__, con));
 
 	return 0;
 }
@@ -521,8 +556,9 @@ void pscom_con_setup_failed(pscom_con_t *con, pscom_err_t err)
 
 	if (pre) {
 		pscom_precon_close(pre);
-		//pscom_precon_destroy(pre);
-		con->precon = NULL;
+		/* pre destroys itself in pscom_precon_check_end()
+		   after the send buffer is drained.*/
+		// pscom_precon_destroy(pre); con->precon = NULL;
 	}
 
 	con->pub.state = PSCOM_CON_STATE_CLOSED;
@@ -546,11 +582,13 @@ void pscom_con_setup_ok(pscom_con_t *con)
 
 	con->pub.state = PSCOM_CON_STATE_RW;
 
-	if (con_state == PSCOM_CON_STATE_CONNECTING) {
+	switch (con_state) {
+	case PSCOM_CON_STATE_CONNECTING:
 		DPRINT(1, "CONNECT %s via %s",
 		       pscom_con_str(&con->pub),
 		       pscom_con_type_str(con->pub.type));
-	} else if (con_state == PSCOM_CON_STATE_ACCEPTING) {
+		break;
+	case PSCOM_CON_STATE_ACCEPTING:
 		DPRINT(1, "ACCEPT  %s via %s",
 		       pscom_con_str_reverse(&con->pub),
 		       pscom_con_type_str(con->pub.type));
@@ -561,7 +599,18 @@ void pscom_con_setup_ok(pscom_con_t *con)
 				sock->pub.ops.con_accept(&con->pub);
 			} pscom_lock();
 		}
-	} else {
+		break;
+	case PSCOM_CON_STATE_CONNECTING_ONDEMAND:
+		DPRINT(1, "CONNECT ONDEMAND %s via %s",
+		       pscom_con_str(&con->pub),
+		       pscom_con_type_str(con->pub.type));
+		break;
+	case PSCOM_CON_STATE_ACCEPTING_ONDEMAND:
+		DPRINT(1, "ACCEPT  ONDEMAND %s via %s",
+		       pscom_con_str_reverse(&con->pub),
+		       pscom_con_type_str(con->pub.type));
+		break;
+	default:
 		DPRINT(0, "pscom_con_setup_ok() : connection in wrong state : %s (%s)",
 		       pscom_con_state_str(con_state),
 		       pscom_con_type_str(con->pub.type));
@@ -676,6 +725,69 @@ pscom_err_t pscom_con_connect_loopback(pscom_con_t *con)
 	}
 
 	return PSCOM_SUCCESS;
+}
+
+
+static
+void pscom_con_guard_error(void *_con) {
+	pscom_con_t *con = (pscom_con_t *)_con;
+
+	pscom_con_error(con, PSCOM_OP_RW, PSCOM_ERR_IOERROR);
+}
+
+#define GUARD_BYE 0x25
+
+static
+void pscom_guard_readable(ufd_t *ufd, ufd_info_t *ufd_info) {
+	pscom_con_t *con = (pscom_con_t *)ufd_info->priv;
+	char msg = 0;
+	int error = 0;
+	int rc;
+
+	rc = read(ufd_info->fd, &msg, 1); // Good bye or error?
+	error = (rc <= 0) || (msg != GUARD_BYE);
+
+	/* Callback called in the async thread!! */
+	DPRINT(error ? 1 : 2, "pscom guard con:%p %s", con, error ? "terminated" : "closed");
+
+	// Stop listening
+	ufd_event_clr(ufd, ufd_info, POLLIN);
+
+	if (error) {
+		// Call pscom_con_guard_error in the main thread
+		pscom_backlog_push(pscom_con_guard_error, con);
+	}
+}
+
+
+void pscom_con_guard_start(pscom_con_t *con)
+{
+	precon_t *pre = con->precon;
+	int fd;
+	assert(pre);
+	assert(pre->magic == MAGIC_PRECON);
+	if (!pscom.env.guard) return;
+
+	fd = pre->ufd_info.fd;
+	pre->closefd_on_cleanup = 0;
+	con->con_guard.fd = fd;
+	DPRINT(5, "precon(%p): Start guard on fd %d", pre, fd);
+	pscom_async_on_readable(fd, pscom_guard_readable, con);
+}
+
+
+void pscom_con_guard_stop(pscom_con_t *con)
+{
+	int fd = con->con_guard.fd;
+	if (fd != -1) {
+		char msg = GUARD_BYE;
+		(void)(write(con->con_guard.fd, &msg, 1) || 0); // Send "Good bye", ignore result
+
+		con->con_guard.fd = -1;
+		pscom_async_off_readable(fd, pscom_guard_readable, con);
+		close(fd);
+	}
+	DPRINT(5, "Stop guard on fd %d", fd);
 }
 
 
