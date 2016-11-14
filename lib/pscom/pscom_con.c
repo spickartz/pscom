@@ -387,6 +387,8 @@ pscom_con_t *pscom_con_create(pscom_sock_t *sock)
 	INIT_LIST_HEAD(&con->poll_reader.next);
 	INIT_LIST_HEAD(&con->poll_next_send);
 
+	INIT_LIST_HEAD(&con->shutdown_requested);
+
 	con->con_guard.fd = -1;
 	con->precon = NULL;
 	con->in.req	= 0;

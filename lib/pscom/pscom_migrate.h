@@ -24,7 +24,7 @@
 #define PSCOM_MOSQUITTO_TOPIC_LENGTH 		50
 #define PSCOM_MOSQUITTO_REQ_TOPIC 		"fast/pscom/<hostname>/<pid>/request"
 #define PSCOM_MOSQUITTO_RESP_TOPIC 		"fast/pscom/<hostname>/<pid>/response"
-#define PSCOM_BROKER_HOST 			"devon"
+#define PSCOM_BROKER_HOST 			"zerberus"
 #define PSCOM_BROKER_PORT 			1883
 #define PSCOM_KEEP_ALIVE_INT 			60
 

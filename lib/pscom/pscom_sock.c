@@ -154,6 +154,7 @@ pscom_sock_t *pscom_sock_create(unsigned int userdata_size)
 	INIT_LIST_HEAD(&sock->group_req_unknown);
 	INIT_LIST_HEAD(&sock->pendingioq);
 	INIT_LIST_HEAD(&sock->sendq_suspending);
+	INIT_LIST_HEAD(&sock->shutdown_connections);
 
 	sock->recv_req_cnt_any = 0;
 

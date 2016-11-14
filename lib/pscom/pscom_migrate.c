@@ -82,7 +82,7 @@ int pscom_suspend_plugins(void)
 		/* suspend listen FD: */
 		pscom_suspend_listen(&sock->pub);
 
-		/* iterate over all connections */
+		/* iterate over all connections and post suspend request */
 		struct list_head *tmp_con;
 		list_for_each_safe(pos_con, tmp_con, &sock->connections) {
 			pscom_con_t *con = list_entry(pos_con,
@@ -107,18 +107,58 @@ int pscom_suspend_plugins(void)
 			if (plugin->properties & 
 			    PSCOM_PLUGIN_PROP_NOT_MIGRATABLE) {
 	
-				pscom_con_shutdown(con);	
+				DPRINT(1, "SUSPENDING %s (type: %s)", pscom_con_info_str(&con->pub.remote_con_info),pscom_con_type_str(con->pub.type));
+				pscom_con_shutdown(con);
+				list_add_tail(&con->shutdown_requested, &sock->shutdown_connections);
 
-				/* wait for response */
-				while ( (con->read_is_suspended == 0) || (con->write_is_suspended == 0) ) {
-					con->read_start(con);
-					con->write_start(con);
-					pscom_test_any();
-				}
 			}
 		}
 	}
 
+	/* wait for all connections to be suspended */
+	list_for_each(pos_sock, &pscom.sockets) {
+		pscom_sock_t *sock = list_entry(pos_sock, pscom_sock_t, next);
+
+		/* iterate over all connections and post suspend request */
+		struct list_head *tmp_con;
+		list_for_each_safe(pos_con, tmp_con, &sock->shutdown_connections) {
+			pscom_con_t *con = list_entry(pos_con,
+			    			      pscom_con_t, 
+						      shutdown_requested);
+
+			DPRINT(1, "WAITING for %s (type: %s)", pscom_con_info_str(&con->pub.remote_con_info),pscom_con_type_str(con->pub.type));
+			while ( (con->read_is_suspended == 0) || (con->write_is_suspended == 0) ) {
+				con->read_start(con);
+				con->write_start(con);
+				pscom_test_any();
+			}
+
+			list_del_init(&con->shutdown_requested);
+
+			
+//			/* determine corresponding plugin */
+//			arch = PSCOM_CON_TYPE2ARCH(con->pub.type);
+//		 	plugin = pscom_plugin_by_archid(arch);
+//
+//			/* go to next connection if plugin not set */
+//			if (plugin == NULL)
+//				continue;
+//
+//			
+//			if (plugin->properties & 
+//			    PSCOM_PLUGIN_PROP_NOT_MIGRATABLE) {
+//				DPRINT(1, "Wait for suspending of %s (type: %s)", pscom_con_info_str(&con->pub.remote_con_info),pscom_con_type_str(con->pub.type));
+//				while ( (con->read_is_suspended == 0) || (con->write_is_suspended == 0) ) {
+//					DPRINT(1, "Waiting ...");	
+//					con->read_start(con);
+//					con->write_start(con);
+//					pscom_test_any();
+//				}
+//			}
+		}
+	}
+
+	
 	/*
 	 * Shutdown non-migratable plugins
 	 */

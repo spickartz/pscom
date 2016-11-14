@@ -291,6 +291,8 @@ struct PSCOM_con
 	pscom_poll_reader_t	poll_reader;
 	struct list_head	poll_next_send; // used by pscom.poll_sender
 
+	struct list_head	shutdown_requested;	// List for connections to be shut down 
+
 	struct con_guard	con_guard; // connection guard
 
 	struct {
@@ -345,6 +347,8 @@ struct PSCOM_sock
 
 	struct list_head	groups;		// List of pscom_group_t.next
 	struct list_head	group_req_unknown; // List of pscom_req_t.next (requests with unknown group id)
+
+	struct list_head	shutdown_connections;	// List of pscom_con_t.shutdown_requested
 
 	struct pscom_listener {
 		ufd_info_t	ufd_info;	// TCP listen for new connections
