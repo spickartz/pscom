@@ -133,6 +133,12 @@ typedef struct psmxm_conn {
 } psmxm_conn_t;
 
 
+typedef struct psucp_conn {
+	struct psucp_con_info	*ci;
+	int			reading : 1;
+} psucp_conn_t;
+
+
 typedef struct ondemand_conn {
 	int node_id; /* on demand node_id to connect to */
 	int portno;  /*           portno to connect to */
@@ -206,6 +212,16 @@ typedef struct pscom_rendezvous_data {
 } pscom_rendezvous_data_t;
 
 
+typedef struct pscom_shutdown_msg {
+	int info;
+#if 0
+	union {
+		pscom_shutdown_msg_shm_t	shm;
+		pscom_shutdown_msg_dapl_t	dapl;
+		pscom_shutdown_msg_extoll_t	extoll;
+	} arch;
+#endif
+} pscom_shutdown_msg_t;
 typedef struct pscom_backlog {
 	struct list_head next;
 	void (*call)(void *priv);
@@ -224,6 +240,19 @@ struct PSCOM_con
 	void (*write_stop)(pscom_con_t *con);
 	void (*do_write)(pscom_con_t *con); // used only if .write_start = pscom_poll_write_start
 	void (*close)(pscom_con_t *con);
+
+	void (*write_suspend)(pscom_con_t *con);
+	void (*write_resume)(pscom_con_t *con);
+	int write_is_suspended;
+	int write_is_signaled;
+
+	void (*read_suspend)(pscom_con_t *con);
+	void (*read_resume)(pscom_con_t *con);
+	int read_is_suspended;
+	int read_is_signaled;
+
+	int shutdown_req_status;
+	int shutdown_ack_status;
 
 	/* RMA functions: */
 	/* register mem region for RMA. should return size of
@@ -287,6 +316,7 @@ struct PSCOM_con
 		pselan_conn_t	elan;
 		psextoll_conn_t	extoll;
 		psmxm_conn_t	mxm;
+		psucp_conn_t	ucp;
 		ondemand_conn_t ondemand;
 		pspsm_conn_t    psm;
 		user_conn_t	user; // Future usage (new plugins)
@@ -321,6 +351,7 @@ struct PSCOM_sock
 		unsigned	usercnt;	// Count the users of the listening fd. (keep fd open, if > 0)
 						// (pscom_listen and "on demand" connections)
 		unsigned	activecnt;	// Count active listeners. (poll on fd, if > 0)
+		unsigned	is_suspended;	// Flag indicating that listener is temporarily suspended
 	} listen;
 
 	unsigned int		recv_req_cnt_any; // count all ANY_SOURCE receive requests on this socket
@@ -347,6 +378,26 @@ struct PSCOM_sock
 };
 
 
+typedef enum PSCOM_Migration_state {
+	PSCOM_MIGRATION_INACTIVE=0,
+	PSCOM_MIGRATION_REQUESTED,
+	PSCOM_MIGRATION_PREPARING,
+	PSCOM_MIGRATION_ALLOWED,
+	PSCOM_MIGRATION_FINISHED,
+	PSCOM_MIGRATION_RESUMING,
+} pscom_migration_state_t;
+
+typedef enum PSCOM_Shutdown_state {
+	PSCOM_SHUTDOWN_INACTIVE=0,
+	PSCOM_SHUTDOWN_REQ_POSTED,
+	PSCOM_SHUTDOWN_REQ_SENT,
+	PSCOM_SHUTDOWN_REQ_RECEIVED,
+	PSCOM_SHUTDOWN_ACK_POSTED,
+	PSCOM_SHUTDOWN_ACK_SENT,
+	PSCOM_SHUTDOWN_ACK_RECEIVED,
+} pscom_shutdown_state_t;
+
+
 struct PSCOM
 {
 	ufd_t			ufd;
@@ -356,6 +407,7 @@ struct PSCOM
 	pthread_mutex_t		global_lock;
 	pthread_mutex_t		lock_requests;
 	int			threaded;	// Bool: multithreaded? (=Use locking)
+	volatile pscom_migration_state_t        migration_state;        // Did we receive an interrupt?
 
 	struct list_head	io_doneq; // List of pscom_req_t.next
 
@@ -411,6 +463,7 @@ extern pscom_t pscom;
 #define PSCOM_ARCH_VELO		115
 #define PSCOM_ARCH_CBC		116
 #define PSCOM_ARCH_MXM		117
+#define PSCOM_ARCH_UCP		118
 
 
 #define PSCOM_TCP_PRIO		2
@@ -425,6 +478,7 @@ extern pscom_t pscom;
 #define PSCOM_EXTOLL_PRIO	30
 #define PSCOM_PSM_PRIO		30
 #define PSCOM_MXM_PRIO		30
+#define PSCOM_UCP_PRIO		30
 
 
 #define PSCOM_MSGTYPE_USER	0
@@ -436,7 +490,15 @@ extern pscom_t pscom;
 #define PSCOM_MSGTYPE_BCAST	6
 #define PSCOM_MSGTYPE_BARRIER	7
 #define PSCOM_MSGTYPE_EOF	8
-#define PSCOM_MSGTYPE_SUSPEND	9
+#define PSCOM_MSGTYPE_SHUTDOWN_REQ	9
+#define PSCOM_MSGTYPE_SHUTDOWN_ACK	10
+#define PSCOM_MSGTYPE_SUSPEND   11	
+
+/*
+ * Plugin properties
+ */
+#define PSCOM_PLUGIN_PROP_EMPTY                0x00000000
+#define PSCOM_PLUGIN_PROP_NOT_MIGRATABLE       0x00000001
 
 extern int mt_locked;
 
@@ -552,8 +614,13 @@ void _pscom_send_inplace(pscom_con_t *con, unsigned msg_type,
 
 void pscom_poll_write_start(pscom_con_t *con);
 void pscom_poll_write_stop(pscom_con_t *con);
+void pscom_poll_write_suspend(pscom_con_t *con);
+void pscom_poll_write_resume(pscom_con_t *con);
+
 void pscom_poll_read_start(pscom_con_t *con);
 void pscom_poll_read_stop(pscom_con_t *con);
+void pscom_poll_read_suspend(pscom_con_t *con);
+void pscom_poll_read_resume(pscom_con_t *con);
 
 int pscom_progress(int timeout);
 
@@ -570,6 +637,9 @@ void pscom_listener_user_dec(struct pscom_listener *listener);
 /* active listening on fd */
 void pscom_listener_active_inc(struct pscom_listener *listener);
 void pscom_listener_active_dec(struct pscom_listener *listener);
+
+void pscom_listener_suspend(struct pscom_listener *listener);
+void pscom_listener_resume(struct pscom_listener *listener);
 
 const char *pscom_con_str_reverse(pscom_connection_t *connection);
 

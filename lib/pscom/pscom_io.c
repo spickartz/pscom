@@ -12,6 +12,7 @@
 
 #include "pscom_priv.h"
 #include "pscom_io.h"
+#include "pscom_con.h"
 #include "pscom_queues.h"
 #include "pscom_req.h"
 #include <stdlib.h>
@@ -116,6 +117,10 @@ int is_recv_req_done(pscom_req_t *req)
 {
 	return (req->cur_data.iov_len == 0);
 }
+
+
+static
+void _pscom_rendezvous_read_data(pscom_req_t *user_recv_req, pscom_req_t *rendezvous_req);
 
 
 static inline
@@ -682,6 +687,208 @@ pscom_req_t *_pscom_get_rendezvous_fin_receiver(pscom_con_t *con, pscom_header_n
 
 
 static
+void pscom_shutdown_req_sender_io_done(pscom_request_t *request)
+{
+	pscom_con_t *con = get_con(request->connection);
+
+	con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_SENT;
+
+	/* hold back all further send requests */
+	con->write_suspend(con);
+}
+
+void pscom_post_shutdown_msg(pscom_con_t *con)
+{
+	pscom_req_t * req;
+	pscom_connection_t *connection = &con->pub;
+	pscom_socket_t *socket = connection->socket;
+
+	if(con->shutdown_ack_status == PSCOM_SHUTDOWN_INACTIVE) {
+
+		/* prepare and send SHUTDOWN_REQ */
+		req = pscom_req_create(0, sizeof(pscom_shutdown_msg_t));
+		req->pub.connection = &con->pub;
+		req->pub.ops.io_done = pscom_shutdown_req_sender_io_done;
+
+		req->pub.data_len = sizeof(int);
+		req->pub.data = &socket->listen_portno;
+		assert(socket->listen_portno);
+
+		con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_POSTED;
+		pscom_post_send_direct(req, PSCOM_MSGTYPE_SHUTDOWN_REQ);
+
+		/* wait for request to be processed */
+		pscom_wait(&req->pub);
+		pscom_req_free(req);
+
+		DPRINT(1, "INFO: >>> SHUTDOWN REQ SENT to %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
+	} else {
+		DPRINT(1, "********** PENDING ACK *************");
+	}
+}
+
+static
+void pscom_reset_con_to_ondemand(pscom_con_t *con)
+{
+	pscom_err_t rc;
+	pscom_connection_t *connection = &con->pub;
+	pscom_socket_t *socket = connection->socket;
+
+	/* save name and port */
+	int node_id = connection->remote_con_info.node_id;
+	int remote_portno = connection->portno;
+	char remote_name[8];
+
+
+	memcpy(remote_name, connection->remote_con_info.name, 8);
+
+	/* close the connection */
+	con->close(con);
+	list_del_init(&con->next);
+
+	con->shutdown_req_status = PSCOM_SHUTDOWN_INACTIVE;
+	con->shutdown_ack_status = PSCOM_SHUTDOWN_INACTIVE;
+
+	/* Make sure that if the session has not been started via ondemand,
+	   the accept-related callback gets now disabled: */
+	socket->ops.con_accept = NULL;
+
+	/* re-create on-demand connection: */
+	if ((rc = pscom_connect_ondemand(connection, 
+					 node_id,
+					 remote_portno,
+					 remote_name))) {
+
+		DPRINT(1,"ERROR: Could not connect - '%s' (%d)\n",
+		       pscom_err_str(rc),
+		       rc);
+		exit(-1);
+	}
+}
+
+static
+void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
+{
+	pscom_con_t *con = get_con(request->connection);
+	pscom_connection_t *connection = request->connection;
+
+	con->shutdown_ack_status = PSCOM_SHUTDOWN_ACK_SENT;
+
+	DPRINT(1, "INFO: >>> SHUTDOWN ACK SENT to %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
+	con->write_suspend(con);
+
+	pscom_request_free(request);
+
+	pscom_reset_con_to_ondemand(con);
+
+	if(pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
+		pscom_con_resume(con);
+	}
+}
+
+static
+void pscom_shutdown_req_receiver_io_done(pscom_request_t *request)
+{
+	pscom_req_t *req = get_req(request);
+	pscom_connection_t *connection = request->connection;
+	pscom_con_t *con = get_con(connection);
+	pscom_socket_t *socket = connection->socket;
+
+	DPRINT(1, "INFO: >>> SHUTDOWN REQ RECEIVED from %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
+
+	assert(con->shutdown_ack_status == PSCOM_SHUTDOWN_INACTIVE);
+
+	if(con->shutdown_req_status != PSCOM_SHUTDOWN_INACTIVE) {
+
+		/* This should only happen if two (or more) processes got the MQTT signal
+		   for migration more or less simultaniously... */
+
+		DPRINT(1, "!!! CLASH !!!");
+
+		assert(pscom.migration_state == PSCOM_MIGRATION_PREPARING);
+
+		assert(con->shutdown_req_status == PSCOM_SHUTDOWN_REQ_SENT);
+
+		/* We received a REQ instead of an expected ACK! Therefore, we do not answer likewise with an ACK
+		   but close the connection directly because no more data is expected an our REQ has also already
+		   been sent(or at least posted).
+		   TODO: Sending the REQ is currently synchronous! (Mind the wait in pscom_post_shutdown_msg())
+		   For async, we have to check for REQ_POSTED vs. REQ_SENT and have to ensure that the close()
+		   is only called when the REQ has been sent (-> switch to another shutdown_req_sender_io_done() here?)
+		*/
+
+		assert(con->write_is_suspended);
+
+		con->read_suspend(con);
+
+		pscom_request_free(request);
+
+		pscom_reset_con_to_ondemand(con);
+
+	} else {
+
+		con->shutdown_req_status = PSCOM_SHUTDOWN_REQ_RECEIVED;
+
+		con->read_suspend(con);
+
+		req->pub.ops.io_done = pscom_shutdown_ack_sender_io_done;
+
+		req->pub.data_len = sizeof(int);
+		req->pub.data = &socket->listen_portno;
+		assert(socket->listen_portno);
+
+		DPRINT(1, "INFO: >>> SHUTDOWN ACK GOING POSTED to %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
+
+		con->shutdown_ack_status = PSCOM_SHUTDOWN_ACK_POSTED;
+		pscom_post_send_direct(req, PSCOM_MSGTYPE_SHUTDOWN_ACK);
+	}
+}
+
+static
+void pscom_shutdown_ack_receiver_io_done(pscom_request_t *request)
+{
+	pscom_con_t *con = get_con(request->connection);
+	pscom_connection_t *connection = request->connection;
+
+	con->shutdown_req_status = PSCOM_SHUTDOWN_ACK_RECEIVED;
+
+	DPRINT(1, "INFO: >>> SHUTDOWN ACK RECEIVED from %s <<<\n", pscom_con_info_str(&connection->remote_con_info));
+	con->read_suspend(con);
+
+	pscom_request_free(request);
+
+	pscom_reset_con_to_ondemand(con);
+}
+
+
+static
+pscom_req_t *pscom_get_shutdown_receiver(pscom_con_t *con, pscom_header_net_t *nh)
+{
+	pscom_req_t *req;
+	pscom_connection_t *connection = &con->pub;
+
+	req = pscom_req_create(nh->xheader_len, sizeof(pscom_shutdown_msg_t));
+
+	pscom_shutdown_msg_t *shutdown_msg = (pscom_shutdown_msg_t *) req->pub.user;
+
+	if(nh->msg_type == PSCOM_MSGTYPE_SHUTDOWN_REQ) {
+		//assert(pscom.migration_state == PSCOM_MIGRATION_INACTIVE);
+		req->pub.ops.io_done = pscom_shutdown_req_receiver_io_done;
+	} else {
+		assert(nh->msg_type == PSCOM_MSGTYPE_SHUTDOWN_ACK);
+		assert(pscom.migration_state == PSCOM_MIGRATION_PREPARING);
+		req->pub.ops.io_done = pscom_shutdown_ack_receiver_io_done;
+	}
+
+	req->pub.data = &connection->portno;
+	req->pub.data_len = nh->data_len;
+	assert(req->pub.data_len == sizeof(int));
+
+	return req;
+}
+
+
+static
 pscom_req_t *_pscom_get_eof_receiver(pscom_con_t *con, pscom_header_net_t *nh)
 {
 	con->state.eof_received = 1;
@@ -762,6 +969,10 @@ pscom_req_t *_pscom_get_recv_req(pscom_con_t *con, pscom_header_net_t *nh)
 			break;
 		case PSCOM_MSGTYPE_EOF:
 			req = _pscom_get_eof_receiver(con, nh);
+			break;
+		case PSCOM_MSGTYPE_SHUTDOWN_ACK:
+		case PSCOM_MSGTYPE_SHUTDOWN_REQ:
+			req = pscom_get_shutdown_receiver(con, nh);
 			break;
 		case PSCOM_MSGTYPE_SUSPEND:
 			req = _pscom_get_suspend_receiver(con, nh);
@@ -938,7 +1149,7 @@ pscom_read_done(pscom_con_t *con, char *buf, size_t len)
 	return;
 	/* --- */
 err_eof:
-	if (!con->state.eof_received && !con->state.close_called) {
+	if (!con->state.eof_received && !con->state.close_called && (con->pub.type != PSCOM_CON_TYPE_ONDEMAND) ) {
 		/* Received an transport layer eof, without
 		   a previous received PSCOM_MSGTYPE_EOF or call to close. -> Throw an IOERROR: */
 		pscom_con_error(con, PSCOM_OP_READ, PSCOM_ERR_IOERROR);

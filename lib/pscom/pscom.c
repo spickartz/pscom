@@ -42,11 +42,14 @@
 #include "pscom_str_util.h"
 #include "pscom_con.h"
 #include "pscom_env.h"
+#include "pscom_migrate.h"
 #include "pslib.h"
 #include "pscom_async.h"
 
 pscom_t pscom = {
-	.threaded = 0, /* default is unthreaded */
+	.threaded = 0,                                  /* default is unthreaded */
+	.migration_state = PSCOM_MIGRATION_INACTIVE,    /* no shutdown request*/
+
 	/* parameter from environment */
 	.env = PSCOM_ENV_defaults,
 	/* statistic */
@@ -168,30 +171,61 @@ void pscom_poll_write_stop(pscom_con_t *con)
 {
 	/* it's save to dequeue more then once */
 	list_del_init(&con->poll_next_send);
+
+	con->write_is_signaled = 0;
 }
 
 
 void pscom_poll_write_start(pscom_con_t *con)
 {
-	if (list_empty(&con->poll_next_send)) {
-		list_add_tail(&con->poll_next_send, &pscom.poll_sender);
+	assert(con->pub.type != PSCOM_CON_TYPE_ONDEMAND);
+
+	/* only send if con is not suspended */
+	if(!con->write_is_suspended) {
+		if (list_empty(&con->poll_next_send)) {
+			list_add_tail(&con->poll_next_send, &pscom.poll_sender);
+		}
+		con->do_write(con);
+		/* Dont do anything after this line.
+		   do_write() can reenter pscom_poll_write_start()! */
 	}
-	con->do_write(con);
-	/* Dont do anything after this line.
-	   do_write() can reenter pscom_poll_write_start()! */
 }
+
+void pscom_poll_write_suspend(pscom_con_t *con)
+{
+	/* it's save to dequeue more then once */
+	list_del_init(&con->poll_next_send);
+
+	con->write_is_suspended = 1;
+}
+
+void pscom_poll_write_resume(pscom_con_t *con)
+{
+	con->write_is_suspended = 0;
+
+	/* there was a send attempt in the meantime */
+	if(con->write_is_signaled) {
+		con->write_start(con);
+	}
+}
+
 
 
 void pscom_poll_read_start(pscom_con_t *con)
 {
-	pscom_poll_reader_t *reader = &con->poll_reader;
-	if (list_empty(&reader->next)) {
-		list_add_tail(&reader->next, &pscom.poll_reader);
-	}
+	assert(con->pub.type != PSCOM_CON_TYPE_ONDEMAND);
 
-	reader->do_read(reader);
-	/* Dont do anything after this line.
-	   do_read() can reenter pscom_poll_read_start()! */
+	/* only recv if con is not suspended */
+	if(!con->read_is_suspended) {
+		pscom_poll_reader_t *reader = &con->poll_reader;
+		if (list_empty(&reader->next)) {
+			list_add_tail(&reader->next, &pscom.poll_reader);
+		}
+
+		reader->do_read(reader);
+		/* Dont do anything after this line.
+		   do_read() can reenter pscom_poll_read_start()! */
+	}
 }
 
 
@@ -201,12 +235,39 @@ void pscom_poll_read_stop(pscom_con_t *con)
 
 	/* it's save to dequeue more then once */
 	list_del_init(&reader->next);
+
+	con->read_is_signaled  = 0;
+}
+
+void pscom_poll_read_suspend(pscom_con_t *con)
+{
+	pscom_poll_reader_t *reader = &con->poll_reader;
+
+	/* it's save to dequeue more then once */
+	list_del_init(&reader->next);
+
+	con->read_is_suspended = 1;
+}
+
+void pscom_poll_read_resume(pscom_con_t *con)
+{
+	con->read_is_suspended = 0;
+
+	/* there was a recv attempt in the meantime */
+	if(con->read_is_signaled) {
+		con->read_start(con);
+	}
 }
 
 
 int pscom_progress(int timeout)
 {
 	struct list_head *pos, *next;
+	if (pscom.env.suspend_resume && 
+	    (pscom.migration_state == PSCOM_MIGRATION_REQUESTED)) {
+		pscom_migration_handle_shutdown_req();
+		return 0;
+	}
 
 	list_for_each_safe(pos, next, &pscom.poll_sender) {
 		pscom_con_t *con = list_entry(pos, pscom_con_t, poll_next_send);
@@ -255,6 +316,8 @@ int pscom_progress(int timeout)
 static
 void pscom_cleanup(void)
 {
+	pscom_migration_cleanup();
+
 	DPRINT(3,"pscom_cleanup()");
 	while (!list_empty(&pscom.sockets)) {
 		pscom_sock_t *sock = list_entry(pscom.sockets.next, pscom_sock_t, next);
@@ -355,6 +418,7 @@ int pscom_init(int pscom_version)
 	pscom_pslib_init();
 	pscom_env_init();
 	pscom_debug_init();
+	pscom_migration_init();
 
 	if (pscom.env.sigsuspend) {
 		signal(pscom.env.sigsuspend, _pscom_suspend_sighandler);

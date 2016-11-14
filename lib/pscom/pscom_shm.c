@@ -31,6 +31,8 @@
 #if defined(__x86_64__) && !(defined(__KNC__) || defined(__MIC__))
 /* We need memory barriers only for x86_64 (?) */
 #define shm_mb()    asm volatile("mfence":::"memory")
+#elif defined(__aarch64__)
+#define shm_mb()    asm volatile("dsb sy" ::: "memory")
 #elif defined(__ia64__)
 #define shm_mb()    asm volatile ("mf" ::: "memory")
 #else
@@ -38,9 +40,20 @@
 #define shm_mb()    asm volatile ("" :::"memory")
 #endif
 
+#define SHM_DIRECT	400
+
+#if !(defined(__KNC__) || defined(__MIC__))
+#define SHM_INDIRECT	(SHM_DIRECT)
+#else
+/* On KNC fall back to buffered send, when direct send fails. */
+#define SHM_INDIRECT	~0
+#endif
+
 
 static
-unsigned shm_direct = 400;
+unsigned shm_direct = SHM_DIRECT;
+static
+unsigned shm_indirect = SHM_INDIRECT;
 
 static
 struct {
@@ -466,7 +479,10 @@ void shm_do_write(pscom_con_t *con)
 			void *data;
 			shm_msg_t *msg;
 
-			if (!is_psshm_enabled()) goto do_buffered_send; // Direct shm is disabled.
+			if (!is_psshm_enabled() ||		// Direct shm is disabled.
+			    iov[1].iov_len <= shm_indirect) {	// or (disabled or len to small) for indirect shm
+				goto do_buffered_send;
+			}
 
 			data = malloc(iov[1].iov_len); // try to get a buffer inside the shared mem region
 
@@ -527,6 +543,8 @@ void shm_cleanup_shm_conn(shm_conn_t *shm)
 static
 void shm_close(pscom_con_t *con)
 {
+	pscom_connection_t *connection = &con->pub;
+
 	if (con->arch.shm.local_com) {
 		int i;
 		shm_conn_t *shm = &con->arch.shm;
@@ -540,6 +558,8 @@ void shm_close(pscom_con_t *con)
 
 		assert(list_empty(&con->poll_next_send));
 		assert(list_empty(&con->poll_reader.next));
+
+		DPRINT(1, "INFO: >>> SHM CONNECTION CLOSED! %s <<<", pscom_con_info_str(&connection->remote_con_info));
 	}
 }
 
@@ -577,9 +597,16 @@ void pscom_shm_sock_init(pscom_sock_t *sock)
 	if (psshm_info.size) {
 		DPRINT(2, "PSP_MALLOC = 1 : size = %lu\n", psshm_info.size);
 		pscom_env_get_uint(&shm_direct, ENV_SHM_DIRECT);
+		pscom_env_get_uint(&shm_indirect, ENV_SHM_INDIRECT);
+		if ((shm_indirect > 0) && (shm_indirect != ~0U)) {
+			// compare with len > shm_indirect instead of len >= shm_indirect.
+			// With this shm_indirect=~0 can disable indirect sends.
+			shm_indirect--;
+		}
 	} else {
 		DPRINT(2, "PSP_MALLOC disabled : %s\n", psshm_info.msg);
 		shm_direct = (unsigned)~0;
+		shm_indirect = (unsigned)~0;
 	}
 
 	shm_pending_io.poll_reader.do_read = shm_poll_pending_io;
@@ -649,14 +676,20 @@ error_initsend:
 }
 
 
+void pscom_shm_destroy(void)
+{
+	DPRINT(1, "INFO: >>> SHM PLUGIN DESTROYED! <<<");
+}
+
 pscom_plugin_t pscom_plugin_shm = {
 	.name		= "shm",
 	.version	= PSCOM_PLUGIN_VERSION,
 	.arch_id	= PSCOM_ARCH_SHM,
 	.priority	= PSCOM_SHM_PRIO,
+	.properties     = PSCOM_PLUGIN_PROP_EMPTY,
 
 	.init		= NULL,
-	.destroy	= NULL,
+	.destroy	= pscom_shm_destroy,
 	.sock_init	= pscom_shm_sock_init,
 	.sock_destroy	= NULL,
 	.con_init	= pscom_shm_con_init,

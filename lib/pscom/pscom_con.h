@@ -36,11 +36,14 @@ void pscom_no_rw_start_stop(pscom_con_t *con);
 
 int pscom_tcp_connect(int nodeid, int portno);
 int pscom_is_local(pscom_socket_t *socket, int nodeid, int portno);
+int pscom_any_con_in_precon(void);
 
 pscom_con_t *pscom_ondemand_find_con(pscom_sock_t *sock, const char name[8]);
 pscom_con_t *pscom_ondemand_get_con(pscom_sock_t *sock, const char name[8]);
 void pscom_ondemand_indirect_connect(pscom_con_t *con);
 
+void pscom_con_shutdown(pscom_con_t *con);
+void pscom_con_resume(pscom_con_t *con);
 /* Start the connection guard on con.
    - con must have an active con->precon
    - precon->closefd_on_cleanup will be set to false

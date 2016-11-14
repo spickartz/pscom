@@ -164,7 +164,8 @@ am_libpscom_la_OBJECTS = libpscom_la-pscom.lo libpscom_la-pscom_con.lo \
 	libpscom_la-pscom_str_util.lo libpscom_la-pscom_tcp.lo \
 	libpscom_la-pscom_ufd.lo libpscom_la-pslib.lo \
 	libpscom_la-psshmalloc.lo libpscom_la-pscom_precon.lo \
-	libpscom_la-pscom_async.lo libpscom_la-pscom_suspend.lo
+	libpscom_la-pscom_async.lo libpscom_la-pscom_suspend.lo \
+	libpscom_la-pscom_migrate.lo
 libpscom_la_OBJECTS = $(am_libpscom_la_OBJECTS)
 libpscom_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libpscom_la_CFLAGS) \
@@ -341,6 +342,8 @@ SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
+UCP_CPPFLAGS = @UCP_CPPFLAGS@
+UCP_LDFLAGS = @UCP_LDFLAGS@
 VERSION = @VERSION@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
@@ -431,15 +434,17 @@ libpscom_la_SOURCES = pscom.c pscom_con.c pscom_debug.c			\
 	pscom_io.c pscom_listener.c pscom_ondemand.c pscom_p4s.c	\
 	pscom_plugin.c pscom_queues.c pscom_req.c pscom_shm.c		\
 	pscom_sock.c pscom_str_util.c pscom_tcp.c pscom_ufd.c pslib.c	\
-	psshmalloc.c pscom_precon.c pscom_async.c pscom_suspend.c
+	psshmalloc.c pscom_precon.c pscom_async.c pscom_suspend.c       \
+	pscom_migrate.c
 
 noinst_HEADERS = getid.c list.h pscom_con.h pscom_debug.h pscom_env.h	\
 	pscom_gm.h pscom_group.h pscom_io.h pscom_p4s.h			\
 	pscom_plugin.h pscom_priv.h pscom_queues.h pscom_req.h		\
 	pscom_shm.h pscom_sock.h pscom_str_util.h pscom_tcp.h		\
-	pscom_types.h pscom_ufd.h pscom_util.h psshmalloc.h
+	pscom_types.h pscom_ufd.h pscom_util.h psshmalloc.h             \
+	pscom_migrate.h
 
-libpscom_la_LIBADD = -ldl
+libpscom_la_LIBADD = -ldl -lmosquitto -lssl -lpthread -lcares
 libpscom_la_CFLAGS = $(AM_CFLAGS) -pthread
 
 # intermediate libs needed elsewhere, in bin
@@ -560,6 +565,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpscom_la-pscom_group_bcast.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpscom_la-pscom_io.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpscom_la-pscom_listener.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpscom_la-pscom_migrate.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpscom_la-pscom_ondemand.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpscom_la-pscom_p4s.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpscom_la-pscom_plugin.Plo@am__quote@
@@ -770,6 +776,13 @@ libpscom_la-pscom_suspend.lo: pscom_suspend.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pscom_suspend.c' object='libpscom_la-pscom_suspend.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libpscom_la_CFLAGS) $(CFLAGS) -c -o libpscom_la-pscom_suspend.lo `test -f 'pscom_suspend.c' || echo '$(srcdir)/'`pscom_suspend.c
+
+libpscom_la-pscom_migrate.lo: pscom_migrate.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libpscom_la_CFLAGS) $(CFLAGS) -MT libpscom_la-pscom_migrate.lo -MD -MP -MF $(DEPDIR)/libpscom_la-pscom_migrate.Tpo -c -o libpscom_la-pscom_migrate.lo `test -f 'pscom_migrate.c' || echo '$(srcdir)/'`pscom_migrate.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libpscom_la-pscom_migrate.Tpo $(DEPDIR)/libpscom_la-pscom_migrate.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pscom_migrate.c' object='libpscom_la-pscom_migrate.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libpscom_la_CFLAGS) $(CFLAGS) -c -o libpscom_la-pscom_migrate.lo `test -f 'pscom_migrate.c' || echo '$(srcdir)/'`pscom_migrate.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

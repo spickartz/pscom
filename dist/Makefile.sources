@@ -72,6 +72,7 @@ bin/simul_p4sock/list.h \
 bin/simul_p4sock/simul.c \
 bin/simul_p4sock/simul.gnu.sh \
 bin/test_nodes.c \
+bin/ucp/ucp_pp.c \
 common.am \
 configure \
 configure.ac \
@@ -130,6 +131,8 @@ lib/pscom/pscom_group_bcast.c \
 lib/pscom/pscom_io.c \
 lib/pscom/pscom_io.h \
 lib/pscom/pscom_listener.c \
+lib/pscom/pscom_migrate.c \
+lib/pscom/pscom_migrate.h \
 lib/pscom/pscom_ondemand.c \
 lib/pscom/pscom_p4s.c \
 lib/pscom/pscom_p4s.h \
@@ -206,6 +209,12 @@ lib/pscom4psm/Makefile.am \
 lib/pscom4psm/Makefile.in \
 lib/pscom4psm/pscom_psm.c \
 lib/pscom4psm/pscom_psm.h \
+lib/pscom4ucp/Makefile.am \
+lib/pscom4ucp/Makefile.in \
+lib/pscom4ucp/pscom_ucp.c \
+lib/pscom4ucp/pscom_ucp.h \
+lib/pscom4ucp/psucp.c \
+lib/pscom4ucp/psucp.h \
 lib/pscom4velo/Makefile.am \
 lib/pscom4velo/Makefile.in \
 lib/pscom4velo/pscom_extoll.c \
@@ -250,6 +259,8 @@ m4/ltoptions.m4 \
 m4/ltsugar.m4 \
 m4/ltversion.m4 \
 m4/lt~obsolete.m4 \
+pscom_bin_examples_mqtt_makefile \
+pscom_bin_mqtt_makefile \
 scripts/Makefile.am \
 scripts/Makefile.in \
 scripts/alldeps \

@@ -83,7 +83,8 @@ typedef enum PSCOM_con_type {
 	PSCOM_CON_TYPE_VELO	= 0x0e,
 	PSCOM_CON_TYPE_CBC      = 0x0f,
 	PSCOM_CON_TYPE_MXM      = 0x10,
-	PSCOM_CON_TYPE_SUSPENDED= 0x11
+	PSCOM_CON_TYPE_SUSPENDED= 0x11,
+	PSCOM_CON_TYPE_UCP      = 0x12,
 } pscom_con_type_t;
 
 
@@ -266,6 +267,8 @@ struct PSCOM_connection
 #else
 	char		userdata[0];
 #endif
+	int nodeid;
+	int portno;
 };
 
 
@@ -326,6 +329,8 @@ pscom_err_t pscom_listen(pscom_socket_t *socket, int portno);
  *
  */
 void pscom_stop_listen(pscom_socket_t *socket);
+void pscom_suspend_listen(pscom_socket_t *socket);
+void pscom_resume_listen(pscom_socket_t *socket);
 
 /* Flush the sendqueue */
 void pscom_flush(pscom_connection_t *connection);
@@ -333,6 +338,8 @@ void pscom_flush(pscom_connection_t *connection);
 /* cancel all active send/recv requests and close the connection */
 void pscom_close_connection(pscom_connection_t *connection);
 
+void pscom_shutdown_connection(pscom_connection_t *connection);
+void pscom_resume_connection(pscom_connection_t *connection);
 
 /* PSCOM_Close_Socket() close all connections. */
 void pscom_close_socket(pscom_socket_t *socket);

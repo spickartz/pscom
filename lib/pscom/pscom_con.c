@@ -16,6 +16,7 @@
 #include "pscom_queues.h"
 #include "pscom_req.h"
 #include "pscom_precon.h"
+#include "pscom_migrate.h"
 #include "pscom_plugin.h"
 #include "pscom_async.h"
 #include "pslib.h"
@@ -300,6 +301,24 @@ void pscom_con_close(pscom_con_t *con)
 		_pscom_con_cleanup(con);
 	}
 }
+
+void pscom_post_shutdown_msg(pscom_con_t *con);
+void pscom_con_shutdown(pscom_con_t *con)
+{
+	pscom_connection_t *connection = &con->pub;
+
+	/* Send SHUTDOWN message */
+
+	pscom_post_shutdown_msg(con);
+}
+
+void pscom_con_resume(pscom_con_t *con)
+{
+	con->write_resume(con);
+	con->read_resume(con);
+}
+
+
 void pscom_con_error(pscom_con_t *con, pscom_op_t operation, pscom_err_t error)
 {
 	assert(con->magic == MAGIC_CONNECTION);
@@ -353,6 +372,8 @@ pscom_con_t *pscom_con_create(pscom_sock_t *sock)
 	con->pub.userdata_size = sock->pub.connection_userdata_size;
 	con->pub.state = PSCOM_CON_STATE_CLOSED;
 	con->pub.type = PSCOM_CON_TYPE_NONE;
+	con->pub.portno = 0;
+	con->pub.nodeid = 0;
 
 	con->recv_req_cnt = 0;
 	INIT_LIST_HEAD(&con->next);
@@ -383,6 +404,21 @@ pscom_con_t *pscom_con_create(pscom_sock_t *sock)
 	con->poll_reader.do_read = NULL;
 	con->do_write = NULL;
 	con->close = pscom_no_rw_start_stop;
+
+
+	con->write_suspend = pscom_poll_write_suspend;
+	con->write_resume = pscom_poll_write_resume;
+	con->write_is_suspended = 0;
+	con->write_is_signaled = 0;
+
+	con->read_suspend = pscom_poll_read_suspend;
+	con->read_resume = pscom_poll_read_resume;
+	con->read_is_suspended = 0;
+	con->read_is_signaled = 0;
+
+	con->shutdown_req_status = PSCOM_SHUTDOWN_INACTIVE;
+	con->shutdown_ack_status = PSCOM_SHUTDOWN_INACTIVE;
+
 	/* RMA */
 	con->rma_mem_register = NULL;
 	con->rma_mem_deregister = NULL;
@@ -492,21 +528,18 @@ void pscom_ondemand_indirect_connect(pscom_con_t *con)
 		   should be terminated with an error. 2.) Peer is
 		   connecting to us at the same time and the listening
 		   tcp port is already closed. This is not an error
-		   and we must not terminate the connection con.  As
-		   we can not distinct between 1 and 2, we ignore
-		   tcp_connect errors in the hope it was 2. In the
-		   worst case this deadlock parallel applications!
+		   and we must not terminate the connection con.
 		   3.) Peer has no receive request on this con and is
 		   not watching for POLLIN on the listening fd. This
-		   is currently unhandled! */
+		   is currently unhandled and cause a connection error! */
 
 		/* Send a rconnect request */
 		DPRINT(PRECON_LL, "precon(%p): send backcon %.8s to %.8s", pre,
 		       con->pub.socket->local_con_info.name, con->pub.remote_con_info.name);
 		pscom_precon_send_PSCOM_INFO_CON_INFO(pre, PSCOM_INFO_BACK_CONNECT);
-		pre->con = NULL; /* Forget the con to avoid a race
-				  *  with a simultanous PSCOM_INFO_CON_INFO_DEMAND
-				  */
+
+		pre->back_connect = 1; /* This is a back connect. */
+
 		pscom_precon_recv_start(pre); // Wait for the PSCOM_INFO_BACK_ACK
 	} else {
 		pscom_precon_destroy(pre);
@@ -579,6 +612,13 @@ void pscom_con_setup_ok(pscom_con_t *con)
 		       pscom_con_state_str(con_state),
 		       pscom_con_type_str(con->pub.type));
 	}
+
+	/* inform MigFra that the connection has been successfully resumed */
+	if ((pscom.env.postpone_feedback == 1) &&
+	    (pscom.migration_state == PSCOM_MIGRATION_RESUMING) && 
+	    !pscom_any_con_in_precon())
+		pscom_report_to_migfra("COMPLETED");
+
 	pscom_con_setup(con);
 }
 
@@ -699,9 +739,10 @@ void pscom_guard_readable(ufd_t *ufd, ufd_info_t *ufd_info) {
 	pscom_con_t *con = (pscom_con_t *)ufd_info->priv;
 	char msg = 0;
 	int error = 0;
+	int rc;
 
-	read(ufd_info->fd, &msg, 1); // Good bye or error?
-	error = msg != GUARD_BYE;
+	rc = read(ufd_info->fd, &msg, 1); // Good bye or error?
+	error = (rc <= 0) || (msg != GUARD_BYE);
 
 	/* Callback called in the async thread!! */
 	DPRINT(error ? 1 : 2, "pscom guard con:%p %s", con, error ? "terminated" : "closed");
@@ -737,7 +778,7 @@ void pscom_con_guard_stop(pscom_con_t *con)
 	int fd = con->con_guard.fd;
 	if (fd != -1) {
 		char msg = GUARD_BYE;
-		write(con->con_guard.fd, &msg, 1); // Good bye
+		(void)(write(con->con_guard.fd, &msg, 1) || 0); // Send "Good bye", ignore result
 
 		con->con_guard.fd = -1;
 		pscom_async_off_readable(fd, pscom_guard_readable, con);
@@ -768,6 +809,32 @@ int pscom_is_local(pscom_socket_t *socket, int nodeid, int portno)
 {
 	return ((nodeid == -1) || (nodeid == INADDR_LOOPBACK) || (nodeid == pscom_get_nodeid())) &&
 		((portno == -1) || (portno == socket->listen_portno));
+}
+
+int pscom_any_con_in_precon(void) {
+	struct list_head *pos_sock;
+	struct list_head *pos_con;
+	int arch;
+	pscom_plugin_t *plugin;
+
+	int res = 0;
+	/* iterate over all sockets */
+	list_for_each(pos_sock, &pscom.sockets) {
+		pscom_sock_t *sock = list_entry(pos_sock, pscom_sock_t, next);
+
+		/* iterate over all connections */
+		list_for_each(pos_con, &sock->connections) {
+			pscom_con_t *con = list_entry(pos_con,
+			    			      pscom_con_t,
+						      next);
+			if (con->precon) {
+				res = 1;
+				break;
+			}
+		}
+	}
+
+	return res;
 }
 
 
@@ -807,6 +874,21 @@ void pscom_close_connection(pscom_connection_t *connection)
 	} pscom_unlock();
 }
 
+void pscom_shutdown_connection(pscom_connection_t *connection)
+{
+	pscom_lock(); {
+		pscom_con_t *con = get_con(connection);
+		pscom_con_shutdown(con);
+	} pscom_unlock();
+}
+
+void pscom_resume_connection(pscom_connection_t *connection)
+{
+	pscom_lock(); {
+		pscom_con_t *con = get_con(connection);
+		pscom_con_resume(con);
+	} pscom_unlock();
+}
 
 pscom_connection_t *pscom_get_next_connection(pscom_socket_t *socket, pscom_connection_t *connection)
 {

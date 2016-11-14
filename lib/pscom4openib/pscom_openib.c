@@ -491,6 +491,33 @@ void pscom_openib_init(void)
 
 }
 
+static
+void pscom_openib_destroy(void)
+{
+	/* destroy psoib and remove reader */
+	if (psoib_destroy()) goto err_psoib_destroy;
+	list_del_init(&pscom_cq_poll.next);
+
+	/* check if there are still outstanding cq entries */	
+	if (psoib_outstanding_cq_entries) goto err_outstanding_cq_entries;
+
+	DPRINT(1, "%s %d: Successfully destroyed OPENIB plugin!", 
+	       __FILE__, __LINE__);
+	return;
+
+err_outstanding_cq_entries:
+	DPRINT(1, 
+	       "%s %d: There are still %u outstanding cq elements",
+	       __FILE__, __LINE__,
+	       psoib_outstanding_cq_entries);
+	return;
+
+err_psoib_destroy:
+	DPRINT(1, 
+	       "%s %d: Could not call psoib_destroy()",
+	       __FILE__, __LINE__);
+	return;
+}
 
 #define PSCOM_INFO_OIB_ID PSCOM_INFO_ARCH_STEP1
 
@@ -551,15 +578,15 @@ error_con_connect:
 	pscom_precon_send_PSCOM_INFO_ARCH_NEXT(con->precon);
 }
 
-
 pscom_plugin_t pscom_plugin = {
 	.name		= "openib",
 	.version	= PSCOM_PLUGIN_VERSION,
 	.arch_id	= PSCOM_ARCH_OPENIB,
 	.priority	= PSCOM_OPENIB_PRIO,
+	.properties 	= PSCOM_PLUGIN_PROP_NOT_MIGRATABLE,
 
 	.init		= pscom_openib_init,
-	.destroy	= NULL,
+	.destroy	= pscom_openib_destroy,
 	.sock_init	= NULL,
 	.sock_destroy	= NULL,
 	.con_init	= pscom_openib_con_init,
