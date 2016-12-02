@@ -743,7 +743,6 @@ void pscom_reset_con_to_ondemand(pscom_con_t *con)
 	memcpy(remote_name, connection->remote_con_info.name, 8);
 
 	/* close the connection */
-	DPRINT(1, "####### RESET CON: %s", pscom_con_info_str(&connection->remote_con_info));	
 	con->close(con);
 	list_del_init(&con->next);
 
@@ -877,12 +876,6 @@ pscom_req_t *pscom_get_shutdown_receiver(pscom_con_t *con, pscom_header_net_t *n
 		req->pub.ops.io_done = pscom_shutdown_req_receiver_io_done;
 	} else {
 		assert(nh->msg_type == PSCOM_MSGTYPE_SHUTDOWN_ACK);
-		DPRINT(1, "####### CONNECTION TYPE: %x", connection->type);	
-		DPRINT(1, "####### CONNECTION NODE: %s", pscom_con_info_str(&connection->remote_con_info));	
-			
-		if (pscom.migration_state != PSCOM_MIGRATION_PREPARING) {
-			DPRINT(1, "##### NOOOOOOOOOO");
-		}
 		assert(pscom.migration_state == PSCOM_MIGRATION_PREPARING);
 		req->pub.ops.io_done = pscom_shutdown_ack_receiver_io_done;
 	}

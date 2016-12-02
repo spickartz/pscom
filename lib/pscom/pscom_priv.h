@@ -291,7 +291,7 @@ struct PSCOM_con
 	pscom_poll_reader_t	poll_reader;
 	struct list_head	poll_next_send; // used by pscom.poll_sender
 
-	struct list_head	shutdown_requested;	// List for connections to be shut down 
+	struct list_head	shutdown_requested; // user by S/R protocol
 
 	struct con_guard	con_guard; // connection guard
 
