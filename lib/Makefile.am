@@ -59,6 +59,12 @@ if OPENIB_ENABLED
     SUBDIRS += pscom4openib
 endif
 
+# -- ivshmem --
+if IVSHMEM_ENABLED   
+    SUBDIRS += pscom4ivshmem
+    SUBDIRS += psmalloc4ivshmem 
+endif
+
 # -- psm --
 if PSM_ENABLED
     SUBDIRS += pscom4psm
