@@ -1,20 +1,5 @@
-/*
- * ParaStation
- *
- * Copyright (C) 2002-2004 ParTec AG, Karlsruhe
- * Copyright (C) 2005-2007 ParTec Cluster Competence Center GmbH, Munich
- *
- * This file may be distributed under the terms of the Q Public License
- * as defined in the file LICENSE.QPL included in the packaging of this
- * file.
- *
- * Author:	Jens Hauke <hauke@par-tec.com>
- */
-/**
- * pscom_ivshmem.c: OPENIB/Infiniband communication
- */
-
 #include "psivshmem.h"
+
 #include <stdio.h>
 #include <stddef.h>
 #include <string.h>
@@ -25,10 +10,9 @@
 #include <assert.h>
 
 #include <malloc.h>
-#include <infiniband/verbs.h>
 
 #include "pscom_priv.h"
-#include "../pscom/psivshmem_malloc.h"	// NEW 
+#include "./direct_mode/psivshmem_malloc.h"	// NEW 
 #include "pscom_io.h"
 #include "pscom_ivshmem.h"   // ADDED !!
 #include "psivshmem.h"

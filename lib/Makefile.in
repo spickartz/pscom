@@ -138,7 +138,7 @@ target_triplet = @target@
 @OPENIB_ENABLED_TRUE@am__append_8 = pscom4openib
 
 # -- ivshmem --
-@IVSHMEM_ENABLED_TRUE@am__append_9 = pscom4ivshmem psmalloc4ivshmem
+@IVSHMEM_ENABLED_TRUE@am__append_9 = pscom4ivshmem
 
 # -- psm --
 @PSM_ENABLED_TRUE@am__append_10 = pscom4psm
@@ -211,8 +211,7 @@ ETAGS = etags
 CTAGS = ctags
 DIST_SUBDIRS = pscom psmalloc pscom4dapl pscom4elan pscom4extoll \
 	pscom4velo pscom4gm pscom4mxm pscom4ucp pscom4ofed \
-	pscom4openib pscom4ivshmem psmalloc4ivshmem pscom4psm psport4 \
-	p4tcp
+	pscom4openib pscom4ivshmem pscom4psm psport4 p4tcp
 am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/common.am
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 am__relativize = \

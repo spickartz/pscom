@@ -10,7 +10,7 @@
 
 #include <malloc.h>
 
-#include "../pscom/psivshmem_malloc.h"
+#include "psivshmem_malloc.h"
 
 /* GNU libc 2.14 defines this macro to declare hook variables as volatile.
    Define it as empty for older libc versions.  */

@@ -18,10 +18,10 @@
 #include <stddef.h>
 
 #include "psivshmem_malloc.h"
-#include "../pscom4ivshmem/metadata.h"
+#include "../metadata.h"
 #include "pscom_env.h"
 //#include "../pscom4ivshmem/psivshmem.h"   //allows to handle pci device! //double include
-#include "../pscom4ivshmem/pscom_ivshmem.h"
+#include "../pscom_ivshmem.h"
 
 struct Psivshmem psivshmem_direct_info = {
 	.base = NULL,

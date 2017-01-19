@@ -62,7 +62,6 @@ endif
 # -- ivshmem --
 if IVSHMEM_ENABLED   
     SUBDIRS += pscom4ivshmem
-    SUBDIRS += psmalloc4ivshmem 
 endif
 
 # -- psm --

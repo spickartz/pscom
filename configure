@@ -1499,7 +1499,7 @@ Optional Features:
   --disable-gm            disable Myrinet support
   --disable-mellanox      disable Mellanox support
   --disable-openib        disable Infiniband OFED with RC support
-  --disable-ivshmem       disable InterVMsharedMemory OFED with RC support
+  --disable-ivshmem       disable inter-VM shared memory support
   --disable-ofed          disable Infiniband OFED with UD support
   --disable-ucp           disable Open UCX support for UCP
   --disable-dapl          disable DAPL support
@@ -12214,16 +12214,16 @@ fi
   LDFLAGS="$LDFLAGS $IVSHMEM_LDFLAGS"
 fi
 
-     ac_fn_c_check_header_mongrel "$LINENO" "infiniband/verbs.h" "ac_cv_header_infiniband_verbs_h" "$ac_includes_default"
-if test "x$ac_cv_header_infiniband_verbs_h" = xyes; then :
+     ac_fn_c_check_header_mongrel "$LINENO" "pthread.h" "ac_cv_header_pthread_h" "$ac_includes_default"
+if test "x$ac_cv_header_pthread_h" = xyes; then :
 
-       { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -libverbs" >&5
-$as_echo_n "checking for main in -libverbs... " >&6; }
-if ${ac_cv_lib_ibverbs_main+:} false; then :
+       { $as_echo "$as_me:${as_lineno-$LINENO}: checking for main in -lpthread" >&5
+$as_echo_n "checking for main in -lpthread... " >&6; }
+if ${ac_cv_lib_pthread_main+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-libverbs  $LIBS"
+LIBS="-lpthread  $LIBS"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -12237,17 +12237,17 @@ return main ();
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_ibverbs_main=yes
+  ac_cv_lib_pthread_main=yes
 else
-  ac_cv_lib_ibverbs_main=no
+  ac_cv_lib_pthread_main=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_ibverbs_main" >&5
-$as_echo "$ac_cv_lib_ibverbs_main" >&6; }
-if test "x$ac_cv_lib_ibverbs_main" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_pthread_main" >&5
+$as_echo "$ac_cv_lib_pthread_main" >&6; }
+if test "x$ac_cv_lib_pthread_main" = xyes; then :
   ax_cv_have_IVSHMEM=yes
 else
   ax_cv_have_IVSHMEM=no
@@ -12920,8 +12920,6 @@ ac_config_files="$ac_config_files lib/pscom4openib/Makefile"
 
 ac_config_files="$ac_config_files lib/pscom4ivshmem/Makefile"
   #Added for ivshmem plugin
-ac_config_files="$ac_config_files lib/psmalloc4ivshmem/Makefile"
- #Added for ivshmem direct mode
 ac_config_files="$ac_config_files lib/pscom4psm/Makefile"
 
 ac_config_files="$ac_config_files lib/psmalloc/Makefile"
@@ -14030,7 +14028,6 @@ do
     "lib/pscom4ucp/Makefile") CONFIG_FILES="$CONFIG_FILES lib/pscom4ucp/Makefile" ;;
     "lib/pscom4openib/Makefile") CONFIG_FILES="$CONFIG_FILES lib/pscom4openib/Makefile" ;;
     "lib/pscom4ivshmem/Makefile") CONFIG_FILES="$CONFIG_FILES lib/pscom4ivshmem/Makefile" ;;
-    "lib/psmalloc4ivshmem/Makefile") CONFIG_FILES="$CONFIG_FILES lib/psmalloc4ivshmem/Makefile" ;;
     "lib/pscom4psm/Makefile") CONFIG_FILES="$CONFIG_FILES lib/pscom4psm/Makefile" ;;
     "lib/psmalloc/Makefile") CONFIG_FILES="$CONFIG_FILES lib/psmalloc/Makefile" ;;
     "lib/psport4/Makefile") CONFIG_FILES="$CONFIG_FILES lib/psport4/Makefile" ;;

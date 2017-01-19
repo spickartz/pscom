@@ -64,7 +64,7 @@ $ make all
 The server is used as shown below:
 
 ```
-$ ./ivshmem-server -s <host-shm-name> -m <size> -c migration-framework
+$ ./ivshmem_server -s <host-shm-name> -m <size> -c migration-framework
 
 ```
 

@@ -145,8 +145,10 @@ am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libpscom4ivshmem_la_DEPENDENCIES =  \
 	$(top_builddir)/lib/pscom/libpscom.la
+am__dirstamp = $(am__leading_dot)dirstamp
 am_libpscom4ivshmem_la_OBJECTS = libpscom4ivshmem_la-pscom_ivshmem.lo \
-	libpscom4ivshmem_la-psivshmem.lo
+	libpscom4ivshmem_la-psivshmem.lo \
+	./direct_mode/libpscom4ivshmem_la-psivshmem_malloc.lo
 libpscom4ivshmem_la_OBJECTS = $(am_libpscom4ivshmem_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -155,6 +157,17 @@ am__v_lt_1 =
 libpscom4ivshmem_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(AM_CFLAGS) $(CFLAGS) $(libpscom4ivshmem_la_LDFLAGS) \
+	$(LDFLAGS) -o $@
+libpsmalloc4ivshmem_la_DEPENDENCIES =  \
+	$(top_builddir)/lib/pscom/libpscom.la
+am_libpsmalloc4ivshmem_la_OBJECTS =  \
+	./direct_mode/libpsmalloc4ivshmem_la-psmallocivshmem.lo \
+	./direct_mode/libpsmalloc4ivshmem_la-psivshmem_malloc.lo \
+	libpsmalloc4ivshmem_la-psivshmem.lo
+libpsmalloc4ivshmem_la_OBJECTS = $(am_libpsmalloc4ivshmem_la_OBJECTS)
+libpsmalloc4ivshmem_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(AM_CFLAGS) $(CFLAGS) $(libpsmalloc4ivshmem_la_LDFLAGS) \
 	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -190,8 +203,10 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libpscom4ivshmem_la_SOURCES)
-DIST_SOURCES = $(libpscom4ivshmem_la_SOURCES)
+SOURCES = $(libpscom4ivshmem_la_SOURCES) \
+	$(libpsmalloc4ivshmem_la_SOURCES)
+DIST_SOURCES = $(libpscom4ivshmem_la_SOURCES) \
+	$(libpsmalloc4ivshmem_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -399,11 +414,15 @@ TXT2MAN = $(top_srcdir)/scripts/txt2man
 
 # FIXME: non-standard
 configdir = $(prefix)/config
-lib_LTLIBRARIES = libpscom4ivshmem.la
-libpscom4ivshmem_la_SOURCES = pscom_ivshmem.c pscom_ivshmem.h psivshmem.c psivshmem.h metadata.h ##psivshmem_malloc.c psivshmem_malloc.h
+lib_LTLIBRARIES = libpscom4ivshmem.la libpsmalloc4ivshmem.la
+libpscom4ivshmem_la_SOURCES = pscom_ivshmem.c pscom_ivshmem.h psivshmem.c psivshmem.h metadata.h ./direct_mode/psivshmem_malloc.c ./direct_mode/psivshmem_malloc.h
 libpscom4ivshmem_la_CPPFLAGS = $(AM_CPPFLAGS) $(IVSHMEM_CPPFLAGS)
 libpscom4ivshmem_la_LDFLAGS = $(AM_LDFLAGS) $(IVSHMEM_LDFLAGS)
 libpscom4ivshmem_la_LIBADD = -lpthread $(top_builddir)/lib/pscom/libpscom.la
+libpsmalloc4ivshmem_la_SOURCES = ./direct_mode/psmallocivshmem.c ./direct_mode/psivshmem_malloc.h ./direct_mode/psivshmem_malloc.c psivshmem.c psivshmem.h
+libpsmalloc4ivshmem_la_CPPFLAGS = $(AM_CPPFLAGS) $(PSM_CPPFLAGS)
+libpsmalloc4ivshmem_la_LDFLAGS = $(AM_LDFLAGS) $(PSM_LDFLAGS)
+libpsmalloc4ivshmem_la_LIBADD = $(top_builddir)/lib/pscom/libpscom.la
 all: all-am
 
 .SUFFIXES:
@@ -473,18 +492,42 @@ clean-libLTLIBRARIES:
 	  echo rm -f $${locs}; \
 	  rm -f $${locs}; \
 	}
+direct_mode/$(am__dirstamp):
+	@$(MKDIR_P) ./direct_mode
+	@: > direct_mode/$(am__dirstamp)
+direct_mode/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) ./direct_mode/$(DEPDIR)
+	@: > direct_mode/$(DEPDIR)/$(am__dirstamp)
+./direct_mode/libpscom4ivshmem_la-psivshmem_malloc.lo:  \
+	direct_mode/$(am__dirstamp) \
+	direct_mode/$(DEPDIR)/$(am__dirstamp)
 
 libpscom4ivshmem.la: $(libpscom4ivshmem_la_OBJECTS) $(libpscom4ivshmem_la_DEPENDENCIES) $(EXTRA_libpscom4ivshmem_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(libpscom4ivshmem_la_LINK) -rpath $(libdir) $(libpscom4ivshmem_la_OBJECTS) $(libpscom4ivshmem_la_LIBADD) $(LIBS)
+./direct_mode/libpsmalloc4ivshmem_la-psmallocivshmem.lo:  \
+	direct_mode/$(am__dirstamp) \
+	direct_mode/$(DEPDIR)/$(am__dirstamp)
+./direct_mode/libpsmalloc4ivshmem_la-psivshmem_malloc.lo:  \
+	direct_mode/$(am__dirstamp) \
+	direct_mode/$(DEPDIR)/$(am__dirstamp)
+
+libpsmalloc4ivshmem.la: $(libpsmalloc4ivshmem_la_OBJECTS) $(libpsmalloc4ivshmem_la_DEPENDENCIES) $(EXTRA_libpsmalloc4ivshmem_la_DEPENDENCIES) 
+	$(AM_V_CCLD)$(libpsmalloc4ivshmem_la_LINK) -rpath $(libdir) $(libpsmalloc4ivshmem_la_OBJECTS) $(libpsmalloc4ivshmem_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
+	-rm -f ./direct_mode/*.$(OBJEXT)
+	-rm -f ./direct_mode/*.lo
 
 distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpscom4ivshmem_la-pscom_ivshmem.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpscom4ivshmem_la-psivshmem.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libpsmalloc4ivshmem_la-psivshmem.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./direct_mode/$(DEPDIR)/libpscom4ivshmem_la-psivshmem_malloc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./direct_mode/$(DEPDIR)/libpsmalloc4ivshmem_la-psivshmem_malloc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./direct_mode/$(DEPDIR)/libpsmalloc4ivshmem_la-psmallocivshmem.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -524,11 +567,40 @@ libpscom4ivshmem_la-psivshmem.lo: psivshmem.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpscom4ivshmem_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libpscom4ivshmem_la-psivshmem.lo `test -f 'psivshmem.c' || echo '$(srcdir)/'`psivshmem.c
 
+./direct_mode/libpscom4ivshmem_la-psivshmem_malloc.lo: ./direct_mode/psivshmem_malloc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpscom4ivshmem_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ./direct_mode/libpscom4ivshmem_la-psivshmem_malloc.lo -MD -MP -MF ./direct_mode/$(DEPDIR)/libpscom4ivshmem_la-psivshmem_malloc.Tpo -c -o ./direct_mode/libpscom4ivshmem_la-psivshmem_malloc.lo `test -f './direct_mode/psivshmem_malloc.c' || echo '$(srcdir)/'`./direct_mode/psivshmem_malloc.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ./direct_mode/$(DEPDIR)/libpscom4ivshmem_la-psivshmem_malloc.Tpo ./direct_mode/$(DEPDIR)/libpscom4ivshmem_la-psivshmem_malloc.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='./direct_mode/psivshmem_malloc.c' object='./direct_mode/libpscom4ivshmem_la-psivshmem_malloc.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpscom4ivshmem_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ./direct_mode/libpscom4ivshmem_la-psivshmem_malloc.lo `test -f './direct_mode/psivshmem_malloc.c' || echo '$(srcdir)/'`./direct_mode/psivshmem_malloc.c
+
+./direct_mode/libpsmalloc4ivshmem_la-psmallocivshmem.lo: ./direct_mode/psmallocivshmem.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpsmalloc4ivshmem_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ./direct_mode/libpsmalloc4ivshmem_la-psmallocivshmem.lo -MD -MP -MF ./direct_mode/$(DEPDIR)/libpsmalloc4ivshmem_la-psmallocivshmem.Tpo -c -o ./direct_mode/libpsmalloc4ivshmem_la-psmallocivshmem.lo `test -f './direct_mode/psmallocivshmem.c' || echo '$(srcdir)/'`./direct_mode/psmallocivshmem.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ./direct_mode/$(DEPDIR)/libpsmalloc4ivshmem_la-psmallocivshmem.Tpo ./direct_mode/$(DEPDIR)/libpsmalloc4ivshmem_la-psmallocivshmem.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='./direct_mode/psmallocivshmem.c' object='./direct_mode/libpsmalloc4ivshmem_la-psmallocivshmem.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpsmalloc4ivshmem_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ./direct_mode/libpsmalloc4ivshmem_la-psmallocivshmem.lo `test -f './direct_mode/psmallocivshmem.c' || echo '$(srcdir)/'`./direct_mode/psmallocivshmem.c
+
+./direct_mode/libpsmalloc4ivshmem_la-psivshmem_malloc.lo: ./direct_mode/psivshmem_malloc.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpsmalloc4ivshmem_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ./direct_mode/libpsmalloc4ivshmem_la-psivshmem_malloc.lo -MD -MP -MF ./direct_mode/$(DEPDIR)/libpsmalloc4ivshmem_la-psivshmem_malloc.Tpo -c -o ./direct_mode/libpsmalloc4ivshmem_la-psivshmem_malloc.lo `test -f './direct_mode/psivshmem_malloc.c' || echo '$(srcdir)/'`./direct_mode/psivshmem_malloc.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ./direct_mode/$(DEPDIR)/libpsmalloc4ivshmem_la-psivshmem_malloc.Tpo ./direct_mode/$(DEPDIR)/libpsmalloc4ivshmem_la-psivshmem_malloc.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='./direct_mode/psivshmem_malloc.c' object='./direct_mode/libpsmalloc4ivshmem_la-psivshmem_malloc.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpsmalloc4ivshmem_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ./direct_mode/libpsmalloc4ivshmem_la-psivshmem_malloc.lo `test -f './direct_mode/psivshmem_malloc.c' || echo '$(srcdir)/'`./direct_mode/psivshmem_malloc.c
+
+libpsmalloc4ivshmem_la-psivshmem.lo: psivshmem.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpsmalloc4ivshmem_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libpsmalloc4ivshmem_la-psivshmem.lo -MD -MP -MF $(DEPDIR)/libpsmalloc4ivshmem_la-psivshmem.Tpo -c -o libpsmalloc4ivshmem_la-psivshmem.lo `test -f 'psivshmem.c' || echo '$(srcdir)/'`psivshmem.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libpsmalloc4ivshmem_la-psivshmem.Tpo $(DEPDIR)/libpsmalloc4ivshmem_la-psivshmem.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='psivshmem.c' object='libpsmalloc4ivshmem_la-psivshmem.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libpsmalloc4ivshmem_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libpsmalloc4ivshmem_la-psivshmem.lo `test -f 'psivshmem.c' || echo '$(srcdir)/'`psivshmem.c
+
 mostlyclean-libtool:
 	-rm -f *.lo
 
 clean-libtool:
 	-rm -rf .libs _libs
+	-rm -rf ./direct_mode/.libs ./direct_mode/_libs
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -645,6 +717,8 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f direct_mode/$(DEPDIR)/$(am__dirstamp)
+	-rm -f direct_mode/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
@@ -655,7 +729,7 @@ clean-am: clean-generic clean-libLTLIBRARIES clean-libtool \
 	mostlyclean-am
 
 distclean: distclean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR) ./direct_mode/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -702,7 +776,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR) ./direct_mode/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
