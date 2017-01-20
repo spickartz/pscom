@@ -64,7 +64,7 @@ typedef struct psivshmem_info_msg_s {
 	signed long direct_offset;
 
 	long ivshmem_buf_offset;
-	char hostname[64];	/* for comparison */ 
+	uuid_t uuid;	/*device identification */ 
 
 } psivshmem_info_msg_t;
 

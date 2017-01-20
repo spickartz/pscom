@@ -87,7 +87,7 @@ int pscom_ivshmem_initsend(ivshmem_conn_t *ivshmem, void* rem_buf_offset)
 {
 	void *buf;
 
-	buf = (void*)(ivshmem->device.iv_shm_base +(long)rem_buf_offset);  //mind: both have own virtual adress spaces ;-)
+	buf = (void*)(ivshmem->device.ivshmem_base +(long)rem_buf_offset);  //mind: both have own virtual adress spaces ;-)
 	if (!buf) goto error;
 
 
@@ -111,7 +111,7 @@ void pscom_ivshmem_init_direct(ivshmem_conn_t *ivshmem, long remote_offset, void
 		return;
 	} 
 
-	void *buf = (void*)((char*)ivshmem->device.iv_shm_base + remote_offset);// = shmat(ivshmemid, 0, IVSHMEM_RDONLY); ToDo
+	void *buf = (void*)((char*)ivshmem->device.ivshmem_base + remote_offset);// = shmat(ivshmemid, 0, IVSHMEM_RDONLY); ToDo
 	assert(buf != (void *) -1 && buf);
 		
 	ivshmem->direct_base = buf; //remote_base;//buf;
@@ -159,7 +159,7 @@ void pscom_ivshmem_recvstart_direct(ivshmem_conn_t *ivshmem, struct iovec iov[2]
 	struct ivshmem_direct_header *dh = (struct ivshmem_direct_header *)(data - sizeof(*dh)); // +++++ defined in this *.c file
 
 	iov[1].iov_base = dh->base + ivshmem->direct_offset;
-	//iov[1].iov_base = ((char*)dh->base - (char*)ivshmem->direct_base) + ivshmem->device.iv_shm_base;
+	//iov[1].iov_base = ((char*)dh->base - (char*)ivshmem->direct_base) + ivshmem->device.ivshmem_base;
 
 //printf("iov_base=%p",iov[1].iov_base);
 
@@ -492,17 +492,11 @@ void pscom_ivshmem_sock_init(pscom_sock_t *sock)
 
 static
 void pscom_ivshmem_info_msg(ivshmem_conn_t *ivshmem, psivshmem_info_msg_t *msg)
-{
-	
-		
-	msg->ivshmem_buf_offset =(long) ((char*)ivshmem->local_com - (char*)ivshmem->device.iv_shm_base);
-	
-	//printf("hostname=%s\n",msg->hostname);
- 
- 	strcpy(msg->hostname, ivshmem->device.metadata->hostname); //hostname required to proove running on same host!
+{	
+	msg->ivshmem_buf_offset =(long) ((char*)ivshmem->local_com - (char*)ivshmem->device.ivshmem_base);
+	uuid_copy(msg->uuid, *(ivshmem->device.uuid));
 	msg->direct_base = psivshmem_direct_info.base;
 	msg->direct_offset = psivshmem_direct_info.baseoffset; // use same buffer first...  //psivshmem_info.base
-
 }
 
 
@@ -510,13 +504,10 @@ static
 void ivshmem_cleanup_ivshmem_conn(ivshmem_conn_t *ivshmem)
 {
 
-
 	if(ivshmem->local_com) psivshmem_free_mem(&(ivshmem->device), ivshmem->local_com, sizeof(psivshmem_com_t));
 	ivshmem->local_com = NULL;
 	ivshmem->remote_com = NULL;
 	ivshmem->direct_base = NULL;
-
-
 }
 
 
@@ -620,8 +611,9 @@ void pscom_ivshmem_handshake(pscom_con_t *con, int type, void *data, unsigned si
 	case PSCOM_INFO_IVSHMEM_MSG1: {
 		psivshmem_info_msg_t *msg = data;
 		assert(size == sizeof(*msg));
-		host_err = (strcmp(msg->hostname, &ivshmem->device.metadata->hostname));
-		
+		//host_err = (strcmp(msg->hostname, &ivshmem->device.metadata->hostname));
+		host_err = (uuid_compare(msg->uuid, *(ivshmem->device.uuid)));		
+
 		if(!host_err){
 		    err =   pscom_ivshmem_initsend(ivshmem,(void*) msg->ivshmem_buf_offset); 
 		    pscom_ivshmem_init_direct(ivshmem, msg->direct_offset, msg->direct_base); 
