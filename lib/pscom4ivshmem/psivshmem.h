@@ -58,8 +58,11 @@ typedef struct ivshmem_pci_dev_s {
 
 //prototypes:
 
+int psivshmem_init_uio_device(ivshmem_pci_dev_t*); // init the device 
+void psivshmem_init_device_handle(ivshmem_pci_dev_t*);
+int psivshmem_atomic_TestAndSet(unsigned char volatile*);
 int psivshmem_find_uio_device(ivshmem_pci_dev_t*);
-unsigned long test_alloc(ivshmem_pci_dev_t*, size_t);
+unsigned long long test_alloc(ivshmem_pci_dev_t*, size_t);
 int free_frame(ivshmem_pci_dev_t*, char*);
 void *alloc_frame(ivshmem_pci_dev_t*);
 void *psivshmem_alloc_mem(ivshmem_pci_dev_t*, size_t);

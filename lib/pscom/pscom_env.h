@@ -215,8 +215,8 @@ struct PSCOM_env {
 	.suspend_resume = 0,						\
 	.postpone_feedback = 0,						\
 	.rendezvous_size_openib = 40000, /* default rendezvous_size for openib */ \
-	.rendezvous_size_ivshmem = 40000,				\ 
-	.rendezvous_size_ucp = ~0, /* default rendezvous_size for ucp */ \
+	.rendezvous_size_ivshmem = 40000,				\
+	.rendezvous_size_ucp = ~0, /* default rendezvous_size for ucp */\
 	.psm_uniq_id = 0,						\
 	.sigquit = 0,							\
 	.sigsuspend = 0,						\

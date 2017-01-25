@@ -494,7 +494,7 @@ static
 void pscom_ivshmem_info_msg(ivshmem_conn_t *ivshmem, psivshmem_info_msg_t *msg)
 {	
 	msg->ivshmem_buf_offset =(long) ((char*)ivshmem->local_com - (char*)ivshmem->device.ivshmem_base);
-	uuid_copy(msg->uuid, *(ivshmem->device.uuid));
+	uuid_copy(msg->uuid, *((uuid_t*)ivshmem->device.uuid));
 	msg->direct_base = psivshmem_direct_info.base;
 	msg->direct_offset = psivshmem_direct_info.baseoffset; // use same buffer first...  //psivshmem_info.base
 }
@@ -504,7 +504,7 @@ static
 void ivshmem_cleanup_ivshmem_conn(ivshmem_conn_t *ivshmem)
 {
 
-	if(ivshmem->local_com) psivshmem_free_mem(&(ivshmem->device), ivshmem->local_com, sizeof(psivshmem_com_t));
+	if(ivshmem->local_com) psivshmem_free_mem(&(ivshmem->device), (char*)ivshmem->local_com, sizeof(psivshmem_com_t));
 	ivshmem->local_com = NULL;
 	ivshmem->remote_com = NULL;
 	ivshmem->direct_base = NULL;
@@ -557,8 +557,7 @@ void pscom_ivshmem_close(pscom_con_t *con)
 
 
 static
-void pscom_ivshmem_init_con(pscom_con_t *con) /*,
-		 /* int con_fd, ivshmem_conn_t *ivshmem)*/
+void pscom_ivshmem_init_con(pscom_con_t *con)
 {
 
 //	con->pub.state = PSCOM_CON_STATE_RW;
@@ -612,7 +611,7 @@ void pscom_ivshmem_handshake(pscom_con_t *con, int type, void *data, unsigned si
 		psivshmem_info_msg_t *msg = data;
 		assert(size == sizeof(*msg));
 		//host_err = (strcmp(msg->hostname, &ivshmem->device.metadata->hostname));
-		host_err = (uuid_compare(msg->uuid, *(ivshmem->device.uuid)));		
+		host_err = (uuid_compare(msg->uuid, *((uuid_t*)ivshmem->device.uuid)));		
 
 		if(!host_err){
 		    err =   pscom_ivshmem_initsend(ivshmem,(void*) msg->ivshmem_buf_offset); 

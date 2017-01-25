@@ -86,7 +86,7 @@ int psivshmem_init_uio_device(ivshmem_pci_dev_t *dev) // init the device
    	sprintf(file_path, "/sys/class/uio/%s/maps/map1/size", namelist[n]->d_name);
     	psreadline_from_file(file_path, dev->str_mem_size_hex);
    	dev->mem_size_byte = strtol(dev->str_mem_size_hex, NULL, 0);
-	DPRINT(3, "Mapped Memory Size: %lu",dev->mem_size_byte);
+	DPRINT(3, "Mapped Memory Size: %llu",dev->mem_size_byte);
 	dev->mem_size_mib = dev->mem_size_byte / (float)1024 / (float)1024; // Byte -> KiB -> MiB
 
     	sprintf(file_path, "/sys/class/uio/%s/version", namelist[n]->d_name);
@@ -127,23 +127,23 @@ void psivshmem_init_device_handle(ivshmem_pci_dev_t *dev){
  * The first byte of the shared memory is used as a simple mutex to let the verry first
  * process initialize a pthread spinlock which is inter-vm thread safe.
  */
-    dev->first_byte = dev->ivshmem_base;
-    dev->spinlock = dev->ivshmem_base + sizeof(char);
-    dev->uuid = dev->ivshmem_base + sizeof(char) + sizeof(pthread_spinlock_t);
+    dev->first_byte = (volatile unsigned char*) dev->ivshmem_base;
+    dev->spinlock = (volatile pthread_spinlock_t*)(dev->ivshmem_base + sizeof(char));
+    dev->uuid = (volatile uuid_t*)(dev->ivshmem_base + sizeof(char) + sizeof(pthread_spinlock_t));
     dev->bitmap = dev->ivshmem_base + sizeof(char) + sizeof(pthread_spinlock_t) + sizeof(uuid_t);
     dev->frame_size = IVSHMEM_FRAME_SIZE;
     dev->num_of_frames = dev->mem_size_byte / IVSHMEM_FRAME_SIZE;
     dev->bitmap_length = dev->num_of_frames / (sizeof(char)*CHAR_BIT);
     dev->meta_data_size = (dev->bitmap - dev->ivshmem_base) + dev->bitmap_length * sizeof (char);
-    long long n;
+    unsigned long long n;
 
     // Assumption: unused device contains only zeros
-    if (uuid_is_null(*(dev->uuid)) && psivshmem_atomic_TestAndSet(dev->first_byte)){
+    if (uuid_is_null(*((uuid_t*)dev->uuid)) && psivshmem_atomic_TestAndSet(dev->first_byte)){
     	pthread_spin_init(dev->spinlock, PTHREAD_PROCESS_SHARED);
-        uuid_generate(*(dev->uuid));
+        uuid_generate(*((uuid_t*)dev->uuid));
 	for(n =0; n< dev->bitmap_length; n++) SET_BIT(dev->bitmap,n); //mark used frames
     } 
-    uuid_unparse_lower(dev->uuid, dev->uuid_str);
+    uuid_unparse_lower(*(uuid_t*)dev->uuid, dev->uuid_str);
 }
 
 
@@ -155,7 +155,7 @@ int psivshmem_atomic_TestAndSet(unsigned char volatile* lock_byte){
 }
 
 
-unsigned long test_alloc(ivshmem_pci_dev_t *dev, size_t size){
+unsigned long long test_alloc(ivshmem_pci_dev_t *dev, size_t size){
 /*
  * first implementation: First Fit
  *
@@ -165,8 +165,8 @@ unsigned long test_alloc(ivshmem_pci_dev_t *dev, size_t size){
  * returns -1 if memory is filled
  *
  * */	
-    long n;
-    unsigned long cnt = 0;
+    unsigned long long n;
+    unsigned long long cnt = 0;
 
     for(n=0; n< dev->num_of_frames; n++)
     {
@@ -192,8 +192,8 @@ int psivhmem_free_frame(ivshmem_pci_dev_t *dev, char * frame_ptr)
  * first implementation: just clear corresponding bit in bitmap -> frame is available again
  *
  */
-    long n; 
-    long index;
+    unsigned long long n; 
+    unsigned long long index;
 
     index = (frame_ptr - dev->ivshmem_base) / dev->frame_size;
  
@@ -218,8 +218,8 @@ int psivshmem_free_mem(ivshmem_pci_dev_t *dev, char * frame_ptr, size_t size)
  *
  *
  */
-    long n; 
-    long index_low, index_high;
+    unsigned long long n; 
+    unsigned long long index_low, index_high;
 
     index_low = (frame_ptr - dev->ivshmem_base) / dev->frame_size; //has to be a multiple of it!
     index_high = (frame_ptr - dev->ivshmem_base + size + (dev->frame_size - 1)) / dev->frame_size;
