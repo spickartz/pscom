@@ -140,7 +140,7 @@ void pscom_env_init(void)
 
 	pscom_env_get_uint(&pscom.env.suspend_resume, ENV_SUSPEND_RESUME);
 	/* enable PSP_UNEXPEDTED_RECEIVES if suspend/resume is enabled */
-	if (pscom.env.unexpected_receives != ~0)
+	if (pscom.env.suspend_resume && pscom.env.unexpected_receives != ~0)
 		pscom.env.unexpected_receives = 1;
 	pscom_env_get_uint(&pscom.env.postpone_feedback, ENV_POSTPONE_FEEDBACK);
 	if (pscom.env.rendezvous_size != (unsigned)~0)
