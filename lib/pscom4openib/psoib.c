@@ -47,7 +47,7 @@
 #define IB_MTU	(16*1024) /* must be < 65536, or change sizeof psoib_msgheader_t.payload,
 			     and should be a power of IB_MTU_SPEC */
 
-#define IB_MTU_PAYLOAD	(IB_MTU - sizeof(psoib_msgheader_t))
+#define IB_MTU_PAYLOAD	(IB_MTU - (unsigned)sizeof(psoib_msgheader_t))
 #define IB_MAX_INLINE	64
 
 /* Try several times opening the device; for migration resume */
@@ -1023,8 +1023,8 @@ err_psoib_init:
 
 /* It's important, that the sending side is aligned to IB_MTU_SPEC,
    else we loose a lot of performance!!! */
-static
-int _psoib_sendv(psoib_con_info_t *con_info, struct iovec *iov, int size, unsigned int magic)
+static inline
+ssize_t _psoib_sendv(psoib_con_info_t *con_info, struct iovec *iov, size_t size, unsigned int magic)
 {
     int len;
     int psoiblen;
@@ -1057,7 +1057,7 @@ int _psoib_sendv(psoib_con_info_t *con_info, struct iovec *iov, int size, unsign
 	goto err_busy;
     }
 
-    len = (size <= (int)IB_MTU_PAYLOAD) ? size : (int)IB_MTU_PAYLOAD;
+    len = (size <= IB_MTU_PAYLOAD) ? size : IB_MTU_PAYLOAD;
     psoiblen = PSOIB_LEN(len);
 
     ringbuf_t *send = (con_info->send.bufs.mr) ? &con_info->send : &hca_info->send;
@@ -1143,7 +1143,7 @@ int _psoib_sendv(psoib_con_info_t *con_info, struct iovec *iov, int size, unsign
 }
 
 
-int psoib_sendv(psoib_con_info_t *con_info, struct iovec *iov, int size)
+ssize_t psoib_sendv(psoib_con_info_t *con_info, struct iovec *iov, size_t size)
 {
 	return _psoib_sendv(con_info, iov, size, PSOIB_MAGIC_IO);
 }
