@@ -238,7 +238,7 @@ void pscom_message_callback(struct mosquitto *mosquitto_client,
 	if ((char*)message->payload) {
 		strcpy(payload, (char*)message->payload);
 
-		if (!strcmp(payload, "*")) {
+		if (!strcmp(payload, "*") || !strcmp(payload, "resume") || !strcmp(payload, "suspend")) {
 			pid = -2;
 		} else {
 			msg = strtok(payload, " ");
