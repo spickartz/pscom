@@ -12,9 +12,9 @@
 #include <malloc.h>
 
 #include "pscom_priv.h"
-#include "./direct_mode/psivshmem_malloc.h"	// NEW 
+#include "./direct_mode/psivshmem_malloc.h"
 #include "pscom_io.h"
-#include "pscom_ivshmem.h"   // ADDED !!
+#include "pscom_ivshmem.h"
 #include "psivshmem.h"
 #include "pscom_req.h"
 #include "pscom_util.h"
@@ -33,15 +33,14 @@
 
 /*################################################################################################*/
 
-
-
-static 
-unsigned ivshmem_direct = 400;
+int ivshmem_init_state = 1;
+ivshmem_pci_dev_t pscom_ivshmem_device_handle;
+static unsigned ivshmem_direct = 400;
 
 static
 struct {
 	struct pscom_poll_reader poll_reader; // calling shm_poll_pending_io(). Used if !list_empty(shm_conn_head)
-	struct list_head	ivshmem_conn_head; // shm_conn_t.pending_io_next_conn.
+	struct list_head ivshmem_conn_head; // shm_conn_t.pending_io_next_conn.
 } ivshmem_pending_io;
 
 
@@ -54,31 +53,20 @@ struct ivshmem_direct_header {
 static
 int pscom_ivshmem_initrecv(ivshmem_conn_t *ivshmem)
 {
-
-
 	void *buf;
-
-	psivshmem_debug = pscom.env.debug;
-	psivshmem_debug_stream = pscom_debug_stream();
 	
-	buf = psivshmem_alloc_mem(&ivshmem->device, sizeof(psivshmem_com_t)); //returns ptr to first byte or NULL on error  
+	buf = psivshmem_alloc_mem(ivshmem->device, sizeof(psivshmem_com_t)); //returns ptr to first byte or NULL on error  
 
-		
-	if (!buf) goto error; // ####
-
+	if (!buf) goto error;
 	memset(buf, 0, sizeof(psivshmem_com_t));  // init with zeros
-
 	ivshmem->local_com = (psivshmem_com_t*)buf;
-	
 	ivshmem->recv_cur = 0;
-
 
 	return 0;
 
 error:		
-	DPRINT(1, "psivshmem_alloc_mem unsuccessful...!");
+	DPRINT(1, "ivshmem: psivshmem_alloc_mem unsuccessful...!");
 	return -1;
-
 }
 
 
@@ -87,16 +75,15 @@ int pscom_ivshmem_initsend(ivshmem_conn_t *ivshmem, void* rem_buf_offset)
 {
 	void *buf;
 
-	buf = (void*)(ivshmem->device.ivshmem_base +(long)rem_buf_offset);  //mind: both have own virtual adress spaces ;-)
+	buf = (void*)(ivshmem->device->ivshmem_base +(long)rem_buf_offset);  //mind: both have own virtual adress spaces ;-)
 	if (!buf) goto error;
-
 
 	ivshmem->remote_com = buf;
 	ivshmem->send_cur = 0;
-
 	return 0;
+
 error:
-	DPRINT(1, "Some trouble in pscom_ivshmem_initsend(...)!");
+	DPRINT(1, "ivshmem: Some trouble in pscom_ivshmem_initsend(...)!");
 	return -1;
 }
 
@@ -111,7 +98,7 @@ void pscom_ivshmem_init_direct(ivshmem_conn_t *ivshmem, long remote_offset, void
 		return;
 	} 
 
-	void *buf = (void*)((char*)ivshmem->device.ivshmem_base + remote_offset);// = shmat(ivshmemid, 0, IVSHMEM_RDONLY); ToDo
+	void *buf = (void*)((char*)ivshmem->device->ivshmem_base + remote_offset);// = shmat(ivshmemid, 0, IVSHMEM_RDONLY); ToDo
 	assert(buf != (void *) -1 && buf);
 		
 	ivshmem->direct_base = buf; //remote_base;//buf;
@@ -122,7 +109,7 @@ static inline
 uint32_t pscom_ivshmem_canrecv(ivshmem_conn_t *ivshmem)
 {
 	int cur = ivshmem->recv_cur;
-	psivshmem_buf_t *ivshmembuf = &ivshmem->local_com->buf[cur];  // +++++
+	psivshmem_buf_t *ivshmembuf = &ivshmem->local_com->buf[cur];
 	return ivshmembuf->header.msg_type;
 }
 
@@ -134,7 +121,7 @@ static inline
 void pscom_ivshmem_recvstart(ivshmem_conn_t *ivshmem, char **buf, unsigned int *len)
 {
 	int cur = ivshmem->recv_cur;
-	psivshmem_buf_t *ivshmembuf = &ivshmem->local_com->buf[cur];  // +++++
+	psivshmem_buf_t *ivshmembuf = &ivshmem->local_com->buf[cur];
 
 	*len = ivshmembuf->header.len;
 	*buf = IVSHMEM_DATA(ivshmembuf, *len);
@@ -161,7 +148,7 @@ void pscom_ivshmem_recvstart_direct(ivshmem_conn_t *ivshmem, struct iovec iov[2]
 	iov[1].iov_base = dh->base + ivshmem->direct_offset;
 	//iov[1].iov_base = ((char*)dh->base - (char*)ivshmem->direct_base) + ivshmem->device.ivshmem_base;
 
-//printf("iov_base=%p",iov[1].iov_base);
+	//printf("iov_base=%p",iov[1].iov_base);
 
 	iov[1].iov_len = dh->len;
 }
@@ -173,7 +160,7 @@ void pscom_ivshmem_recvdone(ivshmem_conn_t *ivshmem)
 	int cur = ivshmem->recv_cur;
 	psivshmem_buf_t *ivshmembuf = &ivshmem->local_com->buf[cur];
 
-	ivshmem_mb();	// +++++ macro
+	ivshmem_mb();
 
 	/* Notification: message is read */
 	ivshmembuf->header.msg_type = IVSHMEM_MSGTYPE_NONE;
@@ -322,11 +309,11 @@ void pscom_ivshmem_pending_io_enq(pscom_con_t *con, ivshmem_msg_t *msg, pscom_re
 	ivp->data = data;
 
 	if (!ivshmem->ivshmem_pending) {
-		pscom_ivshmem_pending_io_conn_enq(ivshmem); // +++++
+		pscom_ivshmem_pending_io_conn_enq(ivshmem);
 		ivshmem->ivshmem_pending = ivp;
 	} else {
 		// Append at the end
-		for (old_ivp = ivshmem->ivshmem_pending; old_ivp->next; old_ivp = old_ivp->next); // +++
+		for (old_ivp = ivshmem->ivshmem_pending; old_ivp->next; old_ivp = old_ivp->next);
 		old_ivp->next = ivp;
 	}
 }
@@ -350,9 +337,9 @@ void pscom_ivshmem_do_write(pscom_con_t *con)
 
 	req = pscom_write_get_iov(con, iov);  // pscom_io.c
 
-	if (req && ivshmem_cansend(&con->arch.ivshmem)) {   // +++++
+	if (req && ivshmem_cansend(&con->arch.ivshmem)) {
 		if (iov[1].iov_len < ivshmem_direct ||
-		    iov[0].iov_len > (IVSHMEM_BUFLEN - sizeof(struct ivshmem_direct_header))) { // +++++
+		    iov[0].iov_len > (IVSHMEM_BUFLEN - sizeof(struct ivshmem_direct_header))) {
 		do_buffered_send:
 
 			/* Buffered send : Send through the send & receive buffers. */
@@ -360,22 +347,22 @@ void pscom_ivshmem_do_write(pscom_con_t *con)
 			len = iov[0].iov_len + iov[1].iov_len;
 			len = pscom_min(len, IVSHMEM_BUFLEN);
 
-			pscom_ivshmem_iovsend(&con->arch.ivshmem, iov, len);  // +++++
+			pscom_ivshmem_iovsend(&con->arch.ivshmem, iov, len);
 
 			pscom_write_done(con, req, len);
-		} else if (is_psivshmem_ptr(iov[1].iov_base)) { // +++++    ########### ToDO
+		} else if (is_psivshmem_ptr(iov[1].iov_base)) {
 			/* Direct send : Send a reference to the data iov[1]. */
 	
 			//printf("do_write: direct send!\n ");
 	
-			ivshmem_msg_t *msg = pscom_ivshmem_iovsend_direct(&con->arch.ivshmem, iov); // +++++
+			ivshmem_msg_t *msg = pscom_ivshmem_iovsend_direct(&con->arch.ivshmem, iov);
 
 			pscom_write_pending(con, req, iov[0].iov_len + iov[1].iov_len);
 
 			/* The shm_iovsend_direct is active as long as msg->msg_type == IVSHMEM_MSGTYPE_DIRECT.
 			   We have to call pscom_write_pending_done(con, req) when we got the ack msg_type == SHM_MSGTYPE_DIRECT_DONE. */
 
-			pscom_ivshmem_pending_io_enq(con, msg, req, NULL); // +++++
+			pscom_ivshmem_pending_io_enq(con, msg, req, NULL);
 
 			pscom.stat.ivshmem_direct++;  // ADDED to struct
 		} else {
@@ -402,11 +389,11 @@ void pscom_ivshmem_do_write(pscom_con_t *con)
 			memcpy(data, iov[1].iov_base, iov[1].iov_len);
 			iov[1].iov_base = data;
 
-			msg = pscom_ivshmem_iovsend_direct(&con->arch.ivshmem, iov); // +++++
+			msg = pscom_ivshmem_iovsend_direct(&con->arch.ivshmem, iov);
 
 			pscom_write_done(con, req, iov[0].iov_len + iov[1].iov_len);
 
-			pscom_ivshmem_pending_io_enq(con, msg, NULL, data);  // +++++
+			pscom_ivshmem_pending_io_enq(con, msg, NULL, data);
 
 
 			/* Count messages which should but cant be send with direct_send.
@@ -460,6 +447,7 @@ void pscom_ivshmem_check_pending_io(ivshmem_conn_t *ivshmem)
 	}
 }
 
+
 static
 int pscom_ivshmem_poll_pending_io(pscom_poll_reader_t *poll_reader)
 {
@@ -472,7 +460,6 @@ int pscom_ivshmem_poll_pending_io(pscom_poll_reader_t *poll_reader)
 	}
 	return 0;
 }
-
 
 
 void pscom_ivshmem_sock_init(pscom_sock_t *sock)
@@ -493,8 +480,8 @@ void pscom_ivshmem_sock_init(pscom_sock_t *sock)
 static
 void pscom_ivshmem_info_msg(ivshmem_conn_t *ivshmem, psivshmem_info_msg_t *msg)
 {	
-	msg->ivshmem_buf_offset =(long) ((char*)ivshmem->local_com - (char*)ivshmem->device.ivshmem_base);
-	uuid_copy(msg->uuid, *((uuid_t*)ivshmem->device.uuid));
+	msg->ivshmem_buf_offset =(long) ((char*)ivshmem->local_com - (char*)ivshmem->device->ivshmem_base);
+	uuid_copy(msg->uuid, *((uuid_t*)ivshmem->device->uuid));
 	msg->direct_base = psivshmem_direct_info.base;
 	msg->direct_offset = psivshmem_direct_info.baseoffset; // use same buffer first...  //psivshmem_info.base
 }
@@ -503,13 +490,16 @@ void pscom_ivshmem_info_msg(ivshmem_conn_t *ivshmem, psivshmem_info_msg_t *msg)
 static
 void ivshmem_cleanup_ivshmem_conn(ivshmem_conn_t *ivshmem)
 {
+	int ret = -1;
 
-	if(ivshmem->local_com) psivshmem_free_mem(&(ivshmem->device), (char*)ivshmem->local_com, sizeof(psivshmem_com_t));
-	ivshmem->local_com = NULL;
-	ivshmem->remote_com = NULL;
-	ivshmem->direct_base = NULL;
+	if(ivshmem->local_com){
+	  ret = psivshmem_free_mem(ivshmem->device, (char*)ivshmem->local_com, sizeof(psivshmem_com_t));
+	  assert(ret == 0);
+	  ivshmem->local_com = NULL;
+	  ivshmem->remote_com = NULL;
+	  ivshmem->direct_base = NULL;
+	}
 }
-
 
 
 static
@@ -522,7 +512,7 @@ void pscom_ivshmem_send(ivshmem_conn_t *ivshmem, char *buf, int len)
 	memcpy(IVSHMEM_DATA(ivshmembuf, len), buf, len);
 	ivshmembuf->header.len = len;
 
-	ivshmem_mb(); // +++++
+	ivshmem_mb();
 
 	/* Notification about the new message */
 	ivshmembuf->header.msg_type = IVSHMEM_MSGTYPE_STD;
@@ -539,8 +529,9 @@ void pscom_ivshmem_close(pscom_con_t *con)
 
 		for (i = 0; i < 5; i++) {
 			// ToDo: Unreliable EOF
-			if (ivshmem_cansend(ivshmem)) { // +++++
-				pscom_ivshmem_send(ivshmem, NULL, 0); // +++++
+			if (ivshmem_cansend(ivshmem)) {
+
+				pscom_ivshmem_send(ivshmem, NULL, 0);
 				break;
 			} else {
 				usleep(5*1000);
@@ -548,7 +539,7 @@ void pscom_ivshmem_close(pscom_con_t *con)
 			}
 		}
 
-		ivshmem_cleanup_ivshmem_conn(ivshmem); // +++++
+		ivshmem_cleanup_ivshmem_conn(ivshmem);
 
 		assert(list_empty(&con->poll_next_send));
 		assert(list_empty(&con->poll_reader.next));
@@ -568,9 +559,9 @@ void pscom_ivshmem_init_con(pscom_con_t *con)
 	con->read_start = pscom_poll_read_start;
 	con->read_stop = pscom_poll_read_stop;
 
-	con->poll_reader.do_read = pscom_ivshmem_do_read;  	// +++++
-	con->do_write = pscom_ivshmem_do_write;			// +++++
-	con->close = pscom_ivshmem_close;			// +++++ 
+	con->poll_reader.do_read = pscom_ivshmem_do_read;
+	con->do_write = pscom_ivshmem_do_write;
+	con->close = pscom_ivshmem_close;
 
 	con->rendezvous_size = pscom.env.rendezvous_size_ivshmem;
 	
@@ -581,7 +572,6 @@ void pscom_ivshmem_init_con(pscom_con_t *con)
 static
 void ivshmem_init_ivshmem_conn(ivshmem_conn_t *ivshmem)
 {
-	memset(ivshmem, 0, sizeof(*ivshmem));  // set memory to ZERO 
 	ivshmem->local_com = NULL;
 	ivshmem->remote_com = NULL;
 	ivshmem->direct_base = NULL;
@@ -589,92 +579,158 @@ void ivshmem_init_ivshmem_conn(ivshmem_conn_t *ivshmem)
 }
 
 
+static
+int pscom_ivshmem_same_device_accessible(pscom_con_t *con){
+/* Return 1 is an ivshmem device with the same uuid is available.
+ * Otherwise return 0.
+ * If uuid equals zero, the real uuid is unknown and has to be determined during handshake -> return 1;
+ */
+    	if (uuid_is_null(con->pub.ivshmem_remote_uuid)) return 1; // first try
+	return uuid_compare(con->pub.ivshmem_remote_uuid, *((uuid_t*)con->arch.ivshmem.device->uuid)) ? 0 : 1; 
+}
+
+
+/* pscom_ivshmem_device_handle is a static global structure that contains status intormation and memory base adresses */
+static
+int pscom_ivshmem_con_init(pscom_con_t *con)
+{
+	if(pscom_ivshmem_device_handle.status == IVSHMEM_DISABLED){
+	  /* IVSHMEM_DISABLED is set if psivshmem_init_uio_device fails */
+	  return -1;
+	}
+	
+	con->arch.ivshmem.device = &pscom_ivshmem_device_handle;  //ToDo: just use global variable everywhere? 
+
+	if (uuid_is_null(con->pub.ivshmem_remote_uuid)) {
+	  return 0; // first try -> at least one handshake is necessary
+	}
+
+	if(pscom_ivshmem_same_device_accessible(con) == 1 ){
+	  /* start a handshake */
+	  return 0;
+	}
+	else{
+	  /* clean up ivshem arch structure and return -1 to disable plugin for this connection */
+	  ivshmem_cleanup_ivshmem_conn(&(con->arch.ivshmem));
+	  return -1;
+	}
+
+return -1; //just a default
+}
+
+
+static
+int pscom_connecting_state(pscom_con_t *con)
+{
+	return ((con->pub.state == PSCOM_CON_STATE_CONNECTING) || (con->pub.state == PSCOM_CON_STATE_CONNECTING_ONDEMAND));
+}
+
+
+static
+void pscom_ivshmem_init(void)
+{
+
+	psivshmem_debug = pscom.env.debug;
+	psivshmem_debug_stream = pscom_debug_stream();
+	pscom_lock();
+	if(pscom_ivshmem_device_handle.status != IVSHMEM_INITIALIZED){
+	  /* Try to initialize the ivshmem pci device, if available 
+ 	   * - otherwise IVSHMEM_DISABLED is set in psivshmem_init_uio_device 
+ 	   */
+	  psivshmem_init_uio_device(&pscom_ivshmem_device_handle);
+	}
+	pscom_unlock();
+}
+
+
+static 
+void pscom_ivshmem_destroy(void)
+{
+	int ret;	
+
+	ret = psivshmem_close_device(&pscom_ivshmem_device_handle);
+
+	if(ret){
+	  DPRINT(1,"ivshmem error: device was not closed sucessfully!");
+	  return;
+	}
+
+//	list_del_init(&pscom_cq_poll.next);
+
+	DPRINT(1,"ivshmem: plugin destroyed!");
+}
+
 
 #define PSCOM_INFO_IVSHMEM_MSG1 PSCOM_INFO_ARCH_STEP1
 static
 void pscom_ivshmem_handshake(pscom_con_t *con, int type, void *data, unsigned size)
 {
 	precon_t *pre = con->precon;
-	ivshmem_conn_t *ivshmem = &con->arch.ivshmem;
-	int err = 0;
-	int host_err = 0;
+	ivshmem_pci_dev_t * dev = con->arch.ivshmem.device;
+	int diff_hosts = 0; //different hosts?
+	int error = 0;
+	if (dev->status!=IVSHMEM_INITIALIZED) goto error_device;
+	/* handshake: */
 	switch (type) {
 	case PSCOM_INFO_ARCH_REQ: {
-		ivshmem_init_ivshmem_conn(ivshmem); 		
-		if (psivshmem_init_uio_device(&ivshmem->device)||pscom_ivshmem_initrecv(ivshmem)) goto error_initsend;
+		/* init receive buffers */
+		ivshmem_init_ivshmem_conn(&con->arch.ivshmem); 		
+		error = pscom_ivshmem_initrecv(&con->arch.ivshmem);
+		if(error) goto error_initrecv;
 		psivshmem_info_msg_t msg;
-		pscom_ivshmem_info_msg(ivshmem, &msg);
+		pscom_ivshmem_info_msg(&con->arch.ivshmem, &msg);
 		pscom_precon_send(pre, PSCOM_INFO_IVSHMEM_MSG1, &msg, sizeof(msg));
 		break;
-	}
+		}
 	case PSCOM_INFO_IVSHMEM_MSG1: {
+		/* init send buffers */
 		psivshmem_info_msg_t *msg = data;
 		assert(size == sizeof(*msg));
-		//host_err = (strcmp(msg->hostname, &ivshmem->device.metadata->hostname));
-		host_err = (uuid_compare(msg->uuid, *((uuid_t*)ivshmem->device.uuid)));		
-
-		if(!host_err){
-		    err =   pscom_ivshmem_initsend(ivshmem,(void*) msg->ivshmem_buf_offset); 
-		    pscom_ivshmem_init_direct(ivshmem, msg->direct_offset, msg->direct_base); 
-		
-		}else {
-		    if(con->pub.state == PSCOM_CON_STATE_CONNECTING || con->pub.state == PSCOM_CON_STATE_CONNECTING_ONDEMAND)
-			{
-			   DPRINT(1,"Executed on different physical nodes, ivshmem not possible...\n");
-			   goto error_initrecv;
-			}
-			else
-			{
-			   break;
-			}
-
+		uuid_copy(con->pub.ivshmem_remote_uuid,msg->uuid);
+		diff_hosts = (uuid_compare(msg->uuid, *((uuid_t*)dev->uuid)));
+		if(diff_hosts){
+		  /* Make sure that only the >active< site is aborting the connection
+ 		   * otherwise unexpected behaviour may occur.
+ 		   */ 	
+		  if (pscom_connecting_state(con)) goto error_diffhosts;
+		  else break; // passive site does nothing and waits for ARCH_NEXT
 		}
+		error = pscom_ivshmem_initsend(&con->arch.ivshmem,(void*) msg->ivshmem_buf_offset);
+		pscom_ivshmem_init_direct(&con->arch.ivshmem, msg->direct_offset, msg->direct_base); 	
+		if(error) goto error_initsend;
 		pscom_precon_send(pre, PSCOM_INFO_ARCH_OK, NULL, 0);
 		break;
-
-	}
-	case PSCOM_INFO_ARCH_NEXT:
+		}
+	case PSCOM_INFO_ARCH_NEXT:{
 		/* Cleanup ivshmem */
 		ivshmem_cleanup_ivshmem_conn(&con->arch.ivshmem);
 		break; /* Done (this connection attempt failed) */
-
-	case PSCOM_INFO_ARCH_OK:
+		}
+	case PSCOM_INFO_ARCH_OK:{
 		pscom_con_guard_start(con);
 		break; 
-
-	case PSCOM_INFO_EOF:
+		}
+	case PSCOM_INFO_EOF:{
 		pscom_ivshmem_init_con(con);
 		break; /*Done - use this channel!*/
+		}
 	}
 
 	return;
-	/* --- */
-error_initdevice:
+
+	/* Error handling */
+error_device:
+	DPRINT(2,"ivshmem: PCI device not available for handshake.\n");
+	goto next_arch;
+error_diffhosts:
+	DPRINT(1,"ivshmem: Differnt Device uuids detected. Either executed on different hosts or wrong ivshmem device attached. \n");
+	goto next_arch;
 error_initrecv:
 error_initsend:
-//	pscom_ivshmem_disable();
+	DPRINT(1,"ivshmem: Unexpected error during buffer initialization!\n");
+next_arch:
 	ivshmem_cleanup_ivshmem_conn(&con->arch.ivshmem);
 	pscom_precon_send_PSCOM_INFO_ARCH_NEXT(pre);
-}
-
-void pscom_ivshmem_disable()
-{
- ivshmem_init_state = -1;
-}
-
-int iv_test_init(pscom_con_t *con)
-{
-        	
-	if (ivshmem_init_state == 1) {
-	    /* do initialization */
-	    /* currently not required */
-
-    	ivshmem_init_state = 0;
-    
-     	}
-
-    	return ivshmem_init_state;  /* 0 = success, -1 = error/disabled  */ 
-
 }
 
 
@@ -683,13 +739,11 @@ pscom_plugin_t pscom_plugin = {
 	.version	= PSCOM_PLUGIN_VERSION,
 	.arch_id	= PSCOM_ARCH_IVSHMEM,
 	.priority	= PSCOM_IVSHMEM_PRIO,
-	.properties     = PSCOM_PLUGIN_PROP_EMPTY,
-	.init		= NULL,					//pscom_ivshmem_init,
-	.destroy	= NULL,
-	.sock_init	= pscom_ivshmem_sock_init, 	 	//NULL,
-	.sock_destroy	= NULL,  	// ToDo: needs to be implemented!!
-//	.con_connect	= pscom_ivshmem_connect,
-//	.con_accept	= pscom_ivshmem_accept,
-	.con_init	= iv_test_init,//pscom_ivshmem_init_con, // ####
+	.properties     = PSCOM_PLUGIN_PROP_NOT_MIGRATABLE,
+	.init		= pscom_ivshmem_init,			
+	.destroy	= pscom_ivshmem_destroy,
+	.sock_init	= pscom_ivshmem_sock_init, 
+	.sock_destroy	= NULL, // ToDo ??
+	.con_init	= pscom_ivshmem_con_init,
 	.con_handshake  = pscom_ivshmem_handshake,
 };

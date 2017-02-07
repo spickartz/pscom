@@ -1,31 +1,15 @@
-/*
- * ParaStation
- *
- * Copyright (C) 2002-2004 ParTec AG, Karlsruhe
- * Copyright (C) 2005-2007 ParTec Cluster Competence Center GmbH, Munich
- *
- * This file may be distributed under the terms of the Q Public License
- * as defined in the file LICENSE.QPL included in the packaging of this
- * file.
- *
- * Author:	JonBau
+/* 
+ * Author:	Jonas Baude
  */
-/**
- * pscom_ivshmem.h: Header for INTER-VM Shared Memory Communication
- */
-
 #ifndef _PSCOM_IVSHMEM_H_
 #define _PSCOM_IVSHMEM_H_
 
-//#include <sys/shm.h>
 #include <stdint.h>
 #include <stddef.h>
 #include "list.h"
 #include "pscom_types.h"
 #include "pscom_plugin.h"
 #include "psivshmem.h"
-
-
 
 #if !(defined(__KNC__) || defined(__MIC__))
 #define IVSHMEM_BUFS 8
@@ -45,7 +29,6 @@
 
 #define IVSHMEM_DATA(buf, len) ((char*)(&(buf)->header) - (((len) + 7) & ~7))
 
-static int ivshmem_init_state = 1;
 
 typedef struct ivshmem_msg_s {
         uint32_t len;
@@ -89,8 +72,8 @@ typedef struct ivshmem_conn_s {
 	int		local_id;
 	int		remote_id;
 	void 		*direct_base; /* shm direct base */
-
-	ivshmem_pci_dev_t device;
+	ivshmem_pci_dev_t* device;
+	int		init_state;
 
 	struct list_head pending_io_next_conn; /* next shm_conn_t with pending io. Head: shm_pending_io.shm_conn_head */
 	struct ivshmem_pending *ivshmem_pending; /* first pending io request of this connection */

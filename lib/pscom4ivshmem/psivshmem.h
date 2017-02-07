@@ -19,6 +19,9 @@
 #define IVSHMEM_FRAME_SIZE 4096
 #define DEVICE_NAME "ivshmem"
 #define DEVICE_VERSION "0.0.1"
+#define IVSHMEM_DEVICE_MAGIC 0xcb
+#define IVSHMEM_INITIALIZED 0x4a646d73
+#define IVSHMEM_DISABLED 0x3a46d653
 
 //some bitmanipulation stuff:
 #define WORD_SIZE (CHAR_BIT * sizeof(unsigned char))
@@ -41,6 +44,7 @@ typedef struct ivshmem_pci_dev_s {
 	char str_mem_size_hex[UIO_MAX_NAME_SIZE];
 	float  mem_size_mib;
         char uuid_str[UUID_STRG_LENGTH];
+	unsigned long status;
 	unsigned long long mem_size_byte;
 	unsigned long long num_of_frames;
 	unsigned long long frame_size;
@@ -59,15 +63,16 @@ typedef struct ivshmem_pci_dev_s {
 //prototypes:
 
 int psivshmem_init_uio_device(ivshmem_pci_dev_t*); // init the device 
-void psivshmem_init_device_handle(ivshmem_pci_dev_t*);
-int psivshmem_atomic_TestAndSet(unsigned char volatile*);
+static void psivshmem_init_device_handle(ivshmem_pci_dev_t*);
+static int psivshmem_atomic_TestAndSet(unsigned char volatile*);
 int psivshmem_find_uio_device(ivshmem_pci_dev_t*);
-unsigned long long test_alloc(ivshmem_pci_dev_t*, size_t);
+static unsigned long long test_alloc(ivshmem_pci_dev_t*, size_t);
 int free_frame(ivshmem_pci_dev_t*, char*);
 void *alloc_frame(ivshmem_pci_dev_t*);
 void *psivshmem_alloc_mem(ivshmem_pci_dev_t*, size_t);
 int psivshmem_free_mem(ivshmem_pci_dev_t*, char*, size_t);
-int unmap_device(ivshmem_pci_dev_t*);
+int psivshmem_close_device(ivshmem_pci_dev_t*);
+static void psivshmem_init_wait(ivshmem_pci_dev_t*);
 
 //externs:
 

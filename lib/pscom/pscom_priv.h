@@ -475,8 +475,8 @@ extern pscom_t pscom;
 #define PSCOM_ARCH_VELO		115
 #define PSCOM_ARCH_CBC		116
 #define PSCOM_ARCH_MXM		117
-#define PSCOM_ARCH_UCP		118
-#define PSCOM_ARCH_IVSHMEM	119 
+#define PSCOM_ARCH_UCP		119
+#define PSCOM_ARCH_IVSHMEM	118 
 
 
 #define PSCOM_TCP_PRIO		2

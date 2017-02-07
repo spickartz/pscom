@@ -31,6 +31,7 @@ extern "C" {
 #include <sys/uio.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <uuid/uuid.h>
 
 #define PSCOM_VERSION 0x0200
 
@@ -269,7 +270,8 @@ struct PSCOM_connection
 	char		userdata[0];
 #endif
 	int nodeid;
-	int portno;
+	int portno;	
+	uuid_t ivshmem_remote_uuid;
 };
 
 

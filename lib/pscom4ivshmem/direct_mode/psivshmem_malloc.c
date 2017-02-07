@@ -56,7 +56,11 @@ int psivshmem_init_base(void)
 
 	ivshmem_conn_t ivshmem;
 	
-	ivshmem_pci_dev_t* device_ptr = &ivshmem.device;
+	// Warning Fix: 
+	ivshmem.device = NULL;
+	// ToDo 
+	
+	ivshmem_pci_dev_t* device_ptr = ivshmem.device;
 	
 	psivshmem_init_uio_device(device_ptr); //init device
 
@@ -89,12 +93,12 @@ int psivshmem_init_base(void)
 
 
 	psivshmem_direct_info.base = psivshmem_direct_info.tail = buf;
-	psivshmem_direct_info.baseoffset =(char*)buf - (char*)(ivshmem.device.ivshmem_base);
+	psivshmem_direct_info.baseoffset =(char*)buf - (char*)(ivshmem.device->ivshmem_base);
 	psivshmem_direct_info.end = buf + size;
 //	psivshmem_direct_info.ivshmemid = ivshmemid;   not used anymore, c.f. psshm_malloc.c
 	psivshmem_direct_info.size = size;
 
-	printf("device_base_address=%p, malloc_core_base=%p , baseoffset=%lu , end=%p , size =%lu\n ",ivshmem.device.ivshmem_base,buf,psivshmem_direct_info.baseoffset, psivshmem_direct_info.end, psivshmem_direct_info.size);
+	printf("device_base_address=%p, malloc_core_base=%p , baseoffset=%lu , end=%p , size =%lu\n ",ivshmem.device->ivshmem_base,buf,psivshmem_direct_info.baseoffset, psivshmem_direct_info.end, psivshmem_direct_info.size);
 
 	return 0;
 err:
