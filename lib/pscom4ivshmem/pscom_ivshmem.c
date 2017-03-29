@@ -12,7 +12,6 @@
 #include <malloc.h>
 
 #include "pscom_priv.h"
-#include "./direct_mode/psivshmem_malloc.h"
 #include "pscom_io.h"
 #include "pscom_ivshmem.h"
 #include "psivshmem.h"
@@ -350,62 +349,10 @@ void pscom_ivshmem_do_write(pscom_con_t *con)
 			pscom_ivshmem_iovsend(&con->arch.ivshmem, iov, len);
 
 			pscom_write_done(con, req, len);
-		} else if (is_psivshmem_ptr(iov[1].iov_base)) {
-			/* Direct send : Send a reference to the data iov[1]. */
-	
-			//printf("do_write: direct send!\n ");
-	
-			ivshmem_msg_t *msg = pscom_ivshmem_iovsend_direct(&con->arch.ivshmem, iov);
-
-			pscom_write_pending(con, req, iov[0].iov_len + iov[1].iov_len);
-
-			/* The shm_iovsend_direct is active as long as msg->msg_type == IVSHMEM_MSGTYPE_DIRECT.
-			   We have to call pscom_write_pending_done(con, req) when we got the ack msg_type == SHM_MSGTYPE_DIRECT_DONE. */
-
-			pscom_ivshmem_pending_io_enq(con, msg, req, NULL);
-
-			pscom.stat.ivshmem_direct++;  // ADDED to struct
-		} else {
-			/* Indirect send : Copy data iov[1] to a shared region and send a reference to it. */
-			/* Size is good for direct send, but the data is not inside the shared mem region */
-
-			void *data;
-			ivshmem_msg_t *msg;
-
-//			printf("do_write: indirect send!\n");
-
-			if (!is_psivshmem_enabled()) goto do_buffered_send; // Direct shm is disabled.
-
-//			printf("do_write: psivshmem_enable=1\n");
-			data = malloc(iov[1].iov_len); // try to get a buffer inside the shared mem region ~~~~~~ 
-
-			if (unlikely(!is_psivshmem_ptr(data))) {
-				// Still a non shared buffer
-				free(data);
-				pscom.stat.ivshmem_direct_failed++;
-				goto do_buffered_send; // Giving up. Fallback to buffered send.
-			}
-
-			memcpy(data, iov[1].iov_base, iov[1].iov_len);
-			iov[1].iov_base = data;
-
-			msg = pscom_ivshmem_iovsend_direct(&con->arch.ivshmem, iov);
-
-			pscom_write_done(con, req, iov[0].iov_len + iov[1].iov_len);
-
-			pscom_ivshmem_pending_io_enq(con, msg, NULL, data);
-
-
-			/* Count messages which should but cant be send with direct_send.
-			   Means iov_len >= shm_direct and false == is_psshm_ptr().
-			*/
-			pscom.stat.ivshmem_direct_nonshmptr++;
-		}
-
 
 
 	}
-
+}
 }
 
 
@@ -464,14 +411,6 @@ int pscom_ivshmem_poll_pending_io(pscom_poll_reader_t *poll_reader)
 
 void pscom_ivshmem_sock_init(pscom_sock_t *sock)
 {
-	if (psivshmem_direct_info.size) {    //   malloc heap available (successf. hooked)
-		DPRINT(2, "PSP_IVSHMEM_MALLOC = 1 : size = %lu\n", psivshmem_direct_info.size);
-			pscom_env_get_uint(&ivshmem_direct, ENV_IVSHMEM_DIRECT);
-	} else {
-		DPRINT(2, "PSP_IVSHMEM_MALLOC disabled : %s\n", psivshmem_direct_info.msg);
-		ivshmem_direct = (unsigned)~0;
-	}
-
 	ivshmem_pending_io.poll_reader.do_read = pscom_ivshmem_poll_pending_io;
 	INIT_LIST_HEAD(&ivshmem_pending_io.ivshmem_conn_head);
 }
@@ -482,8 +421,6 @@ void pscom_ivshmem_info_msg(ivshmem_conn_t *ivshmem, psivshmem_info_msg_t *msg)
 {	
 	msg->ivshmem_buf_offset =(long) ((char*)ivshmem->local_com - (char*)ivshmem->device->ivshmem_base);
 	uuid_copy(msg->uuid, *((uuid_t*)ivshmem->device->uuid));
-	msg->direct_base = psivshmem_direct_info.base;
-	msg->direct_offset = psivshmem_direct_info.baseoffset; // use same buffer first...  //psivshmem_info.base
 }
 
 
@@ -629,7 +566,7 @@ int pscom_connecting_state(pscom_con_t *con)
 static
 void pscom_ivshmem_init(void)
 {
-
+printf("\n######## hello world!!\n\n");
 	psivshmem_debug = pscom.env.debug;
 	psivshmem_debug_stream = pscom_debug_stream();
 	pscom_lock();
