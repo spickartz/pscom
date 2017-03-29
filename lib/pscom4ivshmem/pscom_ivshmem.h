@@ -1,6 +1,23 @@
-/* 
- * Author:	Jonas Baude
+/*
+ * Original Work
+ * ParaStation
+ *
+ * Copyright (C) 2002-2004 ParTec AG, Karlsruhe
+ * Copyright (C) 2005 ParTec Cluster Competence Center GmbH, Munich
+ *
+ * This file may be distributed under the terms of the Q Public License
+ * as defined in the file LICENSE.QPL included in the packaging of this
+ * file.
+ *
+ * Author:	Jens Hauke <hauke@par-tec.com>
  */
+
+/*
+ * Modified work
+ * Author:	Jonas Baude <jonas.baude@rwth-aachen.de>
+ *
+ */
+
 #ifndef _PSCOM_IVSHMEM_H_
 #define _PSCOM_IVSHMEM_H_
 
@@ -40,9 +57,6 @@ typedef struct ivshmem_msg_s {
 // contact endpoint info
 typedef struct psivshmem_info_msg_s {
 
-//	int ivshmem_id; /
-
-//	int direct_ivshmem_id;	/* ivshmem direct shared mem id */
 	void *direct_base;	/* base pointer of the IVM shared mem segment */	
 	signed long direct_offset;
 

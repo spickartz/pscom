@@ -1,5 +1,5 @@
 /*
- * Author: Jonas Baude
+ * Author: Jonas Baude <jonas.baude@rwth-aachen.de>
  *
  */
 

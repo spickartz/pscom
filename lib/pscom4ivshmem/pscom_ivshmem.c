@@ -1,3 +1,24 @@
+/*
+ * Original Work
+ * ParaStation
+ *
+ * Copyright (C) 2002-2004 ParTec AG, Karlsruhe
+ * Copyright (C) 2005 ParTec Cluster Competence Center GmbH, Munich
+ *
+ * This file may be distributed under the terms of the Q Public License
+ * as defined in the file LICENSE.QPL included in the packaging of this
+ * file.
+ *
+ * Author:      Jens Hauke <hauke@par-tec.com>
+ */
+
+/*
+ * Modified work
+ * Author:      Jonas Baude <jonas.baude@rwth-aachen.de>
+ * 
+ */
+
+
 #include "psivshmem.h"
 
 #include <stdio.h>
@@ -90,7 +111,6 @@ error:
 static
 void pscom_ivshmem_init_direct(ivshmem_conn_t *ivshmem, long remote_offset, void *remote_base)
 {
-//	printf("offset=%lu\n",remote_offset);
 	if (remote_offset == 0) {
 		ivshmem->direct_offset = 0;
 		ivshmem->direct_base = NULL;
@@ -142,13 +162,9 @@ void pscom_ivshmem_recvstart_direct(ivshmem_conn_t *ivshmem, struct iovec iov[2]
 	iov[0].iov_base = data;
 	iov[0].iov_len = len;
 
-	struct ivshmem_direct_header *dh = (struct ivshmem_direct_header *)(data - sizeof(*dh)); // +++++ defined in this *.c file
+	struct ivshmem_direct_header *dh = (struct ivshmem_direct_header *)(data - sizeof(*dh));
 
 	iov[1].iov_base = dh->base + ivshmem->direct_offset;
-	//iov[1].iov_base = ((char*)dh->base - (char*)ivshmem->direct_base) + ivshmem->device.ivshmem_base;
-
-	//printf("iov_base=%p",iov[1].iov_base);
-
 	iov[1].iov_len = dh->len;
 }
 
@@ -337,8 +353,6 @@ void pscom_ivshmem_do_write(pscom_con_t *con)
 	req = pscom_write_get_iov(con, iov);  // pscom_io.c
 
 	if (req && ivshmem_cansend(&con->arch.ivshmem)) {
-		if (iov[1].iov_len < ivshmem_direct ||
-		    iov[0].iov_len > (IVSHMEM_BUFLEN - sizeof(struct ivshmem_direct_header))) {
 		do_buffered_send:
 
 			/* Buffered send : Send through the send & receive buffers. */
@@ -351,7 +365,6 @@ void pscom_ivshmem_do_write(pscom_con_t *con)
 			pscom_write_done(con, req, len);
 
 
-	}
 }
 }
 
@@ -566,7 +579,6 @@ int pscom_connecting_state(pscom_con_t *con)
 static
 void pscom_ivshmem_init(void)
 {
-printf("\n######## hello world!!\n\n");
 	psivshmem_debug = pscom.env.debug;
 	psivshmem_debug_stream = pscom_debug_stream();
 	pscom_lock();
@@ -591,8 +603,6 @@ void pscom_ivshmem_destroy(void)
 	  DPRINT(1,"ivshmem error: device was not closed sucessfully!");
 	  return;
 	}
-
-//	list_del_init(&pscom_cq_poll.next);
 
 	DPRINT(1,"ivshmem: plugin destroyed!");
 }
