@@ -39,7 +39,7 @@ matrix:
 before_install:
     - travis_retry sudo apt-add-repository ppa:mosquitto-dev/mosquitto-ppa -y
     - travis_retry sudo apt-get -qq update -y
-    - sudo apt-get install libpopt-dev libncurses5-dev libreadline-dev libmosquitto-dev libssl-dev libc-ares-dev
+    - sudo apt-get install libpopt-dev libncurses5-dev libreadline-dev libmosquitto-dev libssl-dev libc-ares-dev uuid-dev
 
 script:
     - mkdir build
@@ -48,9 +48,3 @@ script:
     - make
     - make install
 
-notifications:
-  recipients:
-    - spickartz@eonerc.rwth-aachen.de
-  email:
-    on_success: change
-    on_failure: always

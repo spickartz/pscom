@@ -31,6 +31,7 @@ extern "C" {
 #include <sys/uio.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <uuid/uuid.h>
 
 #define PSCOM_VERSION 0x0200
 
@@ -84,7 +85,8 @@ typedef enum PSCOM_con_type {
 	PSCOM_CON_TYPE_CBC      = 0x0f,
 	PSCOM_CON_TYPE_MXM      = 0x10,
 	PSCOM_CON_TYPE_SUSPENDED= 0x11,
-	PSCOM_CON_TYPE_UCP      = 0x12,
+	PSCOM_CON_TYPE_IVSHMEM  = 0x12,
+	PSCOM_CON_TYPE_UCP      = 0x13
 } pscom_con_type_t;
 
 
@@ -268,7 +270,8 @@ struct PSCOM_connection
 	char		userdata[0];
 #endif
 	int nodeid;
-	int portno;
+	int portno;	
+	uuid_t ivshmem_remote_uuid;
 };
 
 
