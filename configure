@@ -15294,11 +15294,11 @@ else
 $as_echo "$as_me: OPENIB_ENABLED:   no" >&6;}
 fi
 if test -z "$IVSHMEM_ENABLED_TRUE"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: IVSHMEM_ENABLED:   yes" >&5
-$as_echo "$as_me: IVSHMEM_ENABLED:   yes" >&6;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: IVSHMEM_ENABLED:  yes" >&5
+$as_echo "$as_me: IVSHMEM_ENABLED:  yes" >&6;}
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: IVSHMEM_ENABLED:   no" >&5
-$as_echo "$as_me: IVSHMEM_ENABLED:   no" >&6;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: IVSHMEM_ENABLED:  no" >&5
+$as_echo "$as_me: IVSHMEM_ENABLED:  no" >&6;}
 fi
 if test -z "$OFED_ENABLED_TRUE"; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: OFED_ENABLED:     yes" >&5
