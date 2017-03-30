@@ -29,7 +29,7 @@
 #include "pscom_gm.h"
 #include "pscom_env.h"
 #include "pscom_precon.h"
-#include "../pscom4ivshmem/pscom_ivshmem.h" 
+#include "../pscom4ivshmem/pscom_ivshmem.h"
 #include "pscom_debug.h"
 
 
@@ -213,7 +213,7 @@ typedef struct pscom_rendezvous_data {
 		_pscom_rendezvous_data_dapl_t	dapl;
 		_pscom_rendezvous_data_extoll_t	extoll;
 		_pscom_rendezvous_data_openib_t openib;
-		_pscom_rendezvous_data_ivshmem_t ivshmem; 
+		_pscom_rendezvous_data_ivshmem_t ivshmem;
 	}		arch;
 } pscom_rendezvous_data_t;
 
@@ -316,7 +316,7 @@ struct PSCOM_con
 		p4s_conn_t	p4s;
 		psib_conn_t	mvapi;
 		psoib_conn_t	openib;
-		ivshmem_conn_t ivshmem;  
+		ivshmem_conn_t ivshmem;
 		psofed_conn_t	ofed;
 		psgm_conn_t	gm;
 		psdapl_conn_t	dapl;
@@ -376,7 +376,7 @@ struct PSCOM_sock
 //	psib_sock_t		mvapi;
 //	psoib_sock_t		openib;
 //	psofed_sock_t		ofed;
-	ivshmem_sock_t		ivshmem; 
+	ivshmem_sock_t		ivshmem;
 	psgm_sock_t		gm;
 //	psdapl_sock_t		dapl;
 //	pselan_sock_t		elan;
@@ -475,8 +475,8 @@ extern pscom_t pscom;
 #define PSCOM_ARCH_VELO		115
 #define PSCOM_ARCH_CBC		116
 #define PSCOM_ARCH_MXM		117
-#define PSCOM_ARCH_UCP		119
-#define PSCOM_ARCH_IVSHMEM	118 
+#define PSCOM_ARCH_UCP		118
+#define PSCOM_ARCH_IVSHMEM	119
 
 
 #define PSCOM_TCP_PRIO		2
@@ -492,7 +492,7 @@ extern pscom_t pscom;
 #define PSCOM_PSM_PRIO		30
 #define PSCOM_MXM_PRIO		30
 #define PSCOM_UCP_PRIO		30
-#define PSCOM_IVSHMEM_PRIO	80 
+#define PSCOM_IVSHMEM_PRIO	80
 
 
 #define PSCOM_MSGTYPE_USER	0
@@ -506,7 +506,7 @@ extern pscom_t pscom;
 #define PSCOM_MSGTYPE_EOF	8
 #define PSCOM_MSGTYPE_SHUTDOWN_REQ	9
 #define PSCOM_MSGTYPE_SHUTDOWN_ACK	10
-#define PSCOM_MSGTYPE_SUSPEND   11	
+#define PSCOM_MSGTYPE_SUSPEND   11
 
 /*
  * Plugin properties
