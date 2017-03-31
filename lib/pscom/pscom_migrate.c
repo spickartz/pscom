@@ -168,6 +168,31 @@ int pscom_resume_plugins(void)
 	int arch;
 	pscom_plugin_t *plugin;
 
+	/*
+	 * Resume non-migratable plugins
+	 */
+
+	DPRINT(1, "%s %u: Find non-migratable plugins ...", __FILE__, __LINE__);
+	struct list_head *pos_plugin;
+	list_for_each(pos_plugin, &pscom_plugins) {
+		plugin = list_entry(pos_plugin, pscom_plugin_t, next);
+
+		if ((plugin->properties & PSCOM_PLUGIN_PROP_NOT_MIGRATABLE) &&
+		    (plugin->init)) {
+			DPRINT(1,
+			       "%s %u: Initializing '%s' ...",
+			       __FILE__,
+			       __LINE__,
+			       plugin->name);
+			plugin->init();
+			DPRINT(1,
+			       "%s %u: Successfully initialized '%s'!",
+			       __FILE__,
+			       __LINE__,
+			       plugin->name);
+		}
+	}
+
 	/* iterate over all sockets */
 	list_for_each(pos_sock, &pscom.sockets) {
 		pscom_sock_t *sock = list_entry(pos_sock, pscom_sock_t, next);
