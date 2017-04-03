@@ -271,7 +271,6 @@ struct PSCOM_connection
 #endif
 	int nodeid;
 	int portno;
-	uuid_t ivshmem_remote_uuid;
 };
 
 

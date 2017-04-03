@@ -473,26 +473,23 @@ void pscom_ivshmem_send(ivshmem_conn_t *ivshmem, char *buf, int len)
 static
 void pscom_ivshmem_close(pscom_con_t *con)
 {
+	pscom_connection_t *connection = &con->pub;
+
 	if (con->arch.ivshmem.local_com) {
 		int i;
 		ivshmem_conn_t *ivshmem = &con->arch.ivshmem;
 
-		for (i = 0; i < 5; i++) {
-			// ToDo: Unreliable EOF
-			if (ivshmem_cansend(ivshmem)) {
-
-				pscom_ivshmem_send(ivshmem, NULL, 0);
-				break;
-			} else {
-				usleep(5*1000);
-				sched_yield();
-			}
+		// ToDo: This must not be a blocking while loop!
+		while (ivshmem->ivshmem_pending) {
+			pscom_ivshmem_check_pending_io(ivshmem);
 		}
 
 		ivshmem_cleanup_ivshmem_conn(ivshmem);
 
 		assert(list_empty(&con->poll_next_send));
 		assert(list_empty(&con->poll_reader.next));
+
+		DPRINT(1, "INFO: >>> IVSHMEM CONNECTION CLOSED! %s <<<", pscom_con_info_str(&connection->remote_con_info));
 	}
 }
 
@@ -500,8 +497,6 @@ void pscom_ivshmem_close(pscom_con_t *con)
 static
 void pscom_ivshmem_init_con(pscom_con_t *con)
 {
-
-//	con->pub.state = PSCOM_CON_STATE_RW;
 	con->pub.type = PSCOM_CON_TYPE_IVSHMEM;
 
 	con->write_start = pscom_poll_write_start;
@@ -529,17 +524,6 @@ void ivshmem_init_ivshmem_conn(ivshmem_conn_t *ivshmem)
 }
 
 
-static
-int pscom_ivshmem_same_device_accessible(pscom_con_t *con){
-/* Return 1 is an ivshmem device with the same uuid is available.
- * Otherwise return 0.
- * If uuid equals zero, the real uuid is unknown and has to be determined during handshake -> return 1;
- */
-    	if (uuid_is_null(con->pub.ivshmem_remote_uuid)) return 1; // first try
-	return uuid_compare(con->pub.ivshmem_remote_uuid, *((uuid_t*)con->arch.ivshmem.device->uuid)) ? 0 : 1; 
-}
-
-
 /* pscom_ivshmem_device_handle is a static global structure that contains status intormation and memory base adresses */
 static
 int pscom_ivshmem_con_init(pscom_con_t *con)
@@ -550,22 +534,7 @@ int pscom_ivshmem_con_init(pscom_con_t *con)
 	}
 	
 	con->arch.ivshmem.device = &pscom_ivshmem_device_handle;  //ToDo: just use global variable everywhere? 
-
-	if (uuid_is_null(con->pub.ivshmem_remote_uuid)) {
-	  return 0; // first try -> at least one handshake is necessary
-	}
-
-	if(pscom_ivshmem_same_device_accessible(con) == 1 ){
-	  /* start a handshake */
-	  return 0;
-	}
-	else{
-	  /* clean up ivshem arch structure and return -1 to disable plugin for this connection */
-	  ivshmem_cleanup_ivshmem_conn(&(con->arch.ivshmem));
-	  return -1;
-	}
-
-return -1; //just a default
+	return 0;	
 }
 
 
@@ -633,11 +602,14 @@ void pscom_ivshmem_handshake(pscom_con_t *con, int type, void *data, unsigned si
 		/* init send buffers */
 		psivshmem_info_msg_t *msg = data;
 		assert(size == sizeof(*msg));
-		uuid_copy(con->pub.ivshmem_remote_uuid,msg->uuid);
 		diff_hosts = (uuid_compare(msg->uuid, *((uuid_t*)dev->uuid)));
 		if(diff_hosts){
 		  /* Make sure that only the >active< site is aborting the connection
  		   * otherwise unexpected behaviour may occur.
+ 		   *
+ 		   * Special case "Passive VM is not equiped with IVShmem device"
+ 		   * 	-> solved by con_init
+ 		   *
  		   */ 	
 		  if (pscom_connecting_state(con)) goto error_diffhosts;
 		  else break; // passive site does nothing and waits for ARCH_NEXT
@@ -670,7 +642,7 @@ error_device:
 	DPRINT(2,"ivshmem: PCI device not available for handshake.\n");
 	goto next_arch;
 error_diffhosts:
-	DPRINT(1,"ivshmem: Differnt Device uuids detected. Either executed on different hosts or wrong ivshmem device attached. \n");
+	DPRINT(2,"ivshmem: handshake with %s: Differnt device uuids detected. Either executed on different hosts or wrong ivshmem device attached.\n",pscom_con_info_str(&con->pub.remote_con_info));
 	goto next_arch;
 error_initrecv:
 error_initsend:

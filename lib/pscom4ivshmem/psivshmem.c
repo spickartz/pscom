@@ -52,7 +52,6 @@ int psivshmem_init_uio_device(ivshmem_pci_dev_t *dev) // init the device
 {   
     int n;
     struct dirent **namelist;
-    int dev_fd;
     FILE* fd;
     char file_path[UIO_MAX_NAME_SIZE];
 
@@ -74,8 +73,8 @@ int psivshmem_init_uio_device(ivshmem_pci_dev_t *dev) // init the device
 
 	sprintf(file_path, "/dev/%s", namelist[n]->d_name);
      	
-	dev_fd = open(file_path, O_RDWR);
-	if (dev_fd == -1) goto device_error;
+	dev->fd = open(file_path, O_RDWR);
+	if (dev->fd == -1) goto device_error;
 
    	sprintf(file_path, "/sys/class/uio/%s/maps/map1/size", namelist[n]->d_name);
     	psreadline_from_file(file_path, dev->str_mem_size_hex);
@@ -86,7 +85,7 @@ int psivshmem_init_uio_device(ivshmem_pci_dev_t *dev) // init the device
     	sprintf(file_path, "/sys/class/uio/%s/version", namelist[n]->d_name);
 	psreadline_from_file(file_path, dev->version);
 	if (strncmp(dev->version, DEVICE_VERSION,5)) goto version_mismatch;
-        void *map_addr = mmap(NULL,dev->mem_size_byte, PROT_READ|PROT_WRITE, MAP_SHARED, dev_fd,1 * getpagesize());  // last param. overloaded for ivshmem -> 2 memorysegments available; Reg.= 0;  Data = 1;
+        void *map_addr = mmap(NULL,dev->mem_size_byte, PROT_READ|PROT_WRITE, MAP_SHARED, dev->fd,1 * getpagesize());  // last param. overloaded for ivshmem -> 2 memorysegments available; Reg.= 0;  Data = 1;
 	
 	DPRINT(5, "ivshmem: map_addr=%p",map_addr);	
 
@@ -96,7 +95,6 @@ int psivshmem_init_uio_device(ivshmem_pci_dev_t *dev) // init the device
 	
 	if(*(dev->first_byte) != IVSHMEM_DEVICE_MAGIC) goto device_collision;	
 	
-     	close(dev_fd); //keep dev_fd alive? --> no, mmap() saves required data internally, c.f.man pages
 	free(namelist);
 	dev->status = IVSHMEM_INITIALIZED;
 	return 0;
@@ -126,12 +124,18 @@ version_mismatch:
 
 int psivshmem_close_device(ivshmem_pci_dev_t *dev)
 {
+int ret_madvise; 
+int ret_msync;
+
 	if (dev->status != IVSHMEM_INITIALIZED) return -1;
 
+	ret_madvise = posix_madvise((void*)dev->ivshmem_base, dev->mem_size_byte,POSIX_MADV_DONTNEED);	
 	assert(munmap((void*)dev->ivshmem_base, dev->mem_size_byte) == 0);
+	close(dev->fd);
 	memset(dev, 0, sizeof(ivshmem_pci_dev_t));  // init with zeros
 	DPRINT(1,"ivshmem: device closed");
 	return 0;	
+	// ToDo: Check returnvalue of close(dev->fd); 
 }
 
 
