@@ -39,6 +39,7 @@ typedef struct ivshmem_pci_dev_s {
 
 	// local - these variables are not shared
 	int uio_index;
+	int fd; //file descriptor for device file (/dev/uioN)
 	char name[UIO_MAX_NAME_SIZE];
 	char version[UIO_MAX_NAME_SIZE];
 	char str_mem_size_hex[UIO_MAX_NAME_SIZE];
