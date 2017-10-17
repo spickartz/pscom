@@ -43,4 +43,7 @@ void pscom_migration_handle_resume_req(void);
 
 /* inform MigFra that resume is complete */
 void pscom_report_to_migfra(const char *status);
+
+/* migration occured */
+int pscom_migration_occured();
 #endif /* _PSCOM_MIGRATE_H_ */

@@ -534,6 +534,7 @@ int pscom_req_is_done(pscom_request_t *req)
 	return pscom_req_state_is_done(req->state);
 }
 
+int pscom_migrated(void);
 
 /*
  * Collective Operations/ Group handling

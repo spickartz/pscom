@@ -266,7 +266,7 @@ void pscom_poll_read_resume(pscom_con_t *con)
 int pscom_progress(int timeout)
 {
 	struct list_head *pos, *next;
-	if (pscom.env.suspend_resume && 
+	if (pscom.env.suspend_resume &&
 	    (pscom.migration_state == PSCOM_MIGRATION_REQUESTED)) {
 		pscom_migration_handle_shutdown_req();
 		return 0;
@@ -465,4 +465,9 @@ int pscom_test_any(void)
 	} pscom_unlock();
 
 	return ret;
+}
+
+int pscom_migrated(void)
+{
+	return pscom_migration_occured();
 }
