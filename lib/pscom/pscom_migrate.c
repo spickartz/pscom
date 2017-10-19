@@ -27,7 +27,6 @@
 #ifdef _PSCOM_SUPPORT_MIGRATION
 
 static int pscom_mosquitto_initialized;
-static int pscom_migrated_flag = 0;
 static struct mosquitto *pscom_mosquitto_client;
 static  char pscom_mosquitto_req_topic[PSCOM_MOSQUITTO_TOPIC_LENGTH] = PSCOM_MOSQUITTO_REQ_TOPIC;
 static  char pscom_mosquitto_resp_topic[PSCOM_MOSQUITTO_TOPIC_LENGTH] = PSCOM_MOSQUITTO_RESP_TOPIC;
@@ -388,13 +387,15 @@ void pscom_migration_handle_shutdown_req(void)
 		sched_yield();
 	}
 
+	/* set the migration flag */
+	pscom_lock(); {
+		DPRINT(1, "INFO: Setting migrated flag (active)");
+		pscom.migrated_flag = PSCOM_MIGRATION_OCCURED;
+	} pscom_unlock();
+
 	/* resume the connections now */
 	pscom_migration_handle_resume_req();
 
-	/* the the migration flag */
-	pscom_lock(); {
-		pscom_migrated_flag = 1;
-	} pscom_unlock();
 }
 
 int pscom_migration_init(void)
@@ -549,12 +550,12 @@ int pscom_migration_cleanup(void)
 	return PSCOM_SUCCESS;
 }
 
-/* return current value of pscom_migrated_flag and reset the flag */
+/* return current value of migrated_flag and reset the flag */
 int pscom_migration_occured(void) {
 	int ret;
 	pscom_lock(); {
-		ret = pscom_migrated_flag;
-		pscom_migrated_flag = 0;
+		ret = pscom.migrated_flag;
+		pscom.migrated_flag = PSCOM_NOT_MIGRATED;
 	} pscom_unlock();
 	return ret;
 

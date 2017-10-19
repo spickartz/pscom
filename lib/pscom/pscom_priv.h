@@ -385,7 +385,8 @@ struct PSCOM_sock
 	pscom_socket_t		pub;
 };
 
-
+#define PSCOM_NOT_MIGRATED      0
+#define PSCOM_MIGRATION_OCCURED 1
 typedef enum PSCOM_Migration_state {
 	PSCOM_MIGRATION_INACTIVE=0,
 	PSCOM_MIGRATION_REQUESTED,
@@ -416,6 +417,7 @@ struct PSCOM
 	pthread_mutex_t		lock_requests;
 	int			threaded;	// Bool: multithreaded? (=Use locking)
 	volatile pscom_migration_state_t        migration_state;        // Did we receive an interrupt?
+	int migrated_flag;        // Did we see a migration?
 
 	struct list_head	io_doneq; // List of pscom_req_t.next
 

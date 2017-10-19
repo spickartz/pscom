@@ -49,6 +49,7 @@
 pscom_t pscom = {
 	.threaded = 0,                                  /* default is unthreaded */
 	.migration_state = PSCOM_MIGRATION_INACTIVE,    /* no shutdown request*/
+	.migrated_flag = PSCOM_NOT_MIGRATED,    /* no shutdown request*/
 
 	/* parameter from environment */
 	.env = PSCOM_ENV_defaults,

@@ -754,7 +754,7 @@ void pscom_reset_con_to_ondemand(pscom_con_t *con)
 	socket->ops.con_accept = NULL;
 
 	/* re-create on-demand connection: */
-	if ((rc = pscom_connect_ondemand(connection, 
+	if ((rc = pscom_connect_ondemand(connection,
 					 node_id,
 					 remote_portno,
 					 remote_name))) {
@@ -780,6 +780,12 @@ void pscom_shutdown_ack_sender_io_done(pscom_request_t *request)
 	pscom_request_free(request);
 
 	pscom_reset_con_to_ondemand(con);
+
+	/* set the pscom.migrated_flag */
+	pscom_lock(); {
+		DPRINT(1, "INFO: Setting migrated flag (passive)");
+		pscom.migrated_flag = PSCOM_MIGRATION_OCCURED;
+	} pscom_unlock();
 
 	if(pscom.migration_state == PSCOM_MIGRATION_INACTIVE) {
 		pscom_con_resume(con);
