@@ -21,12 +21,12 @@
 #ifndef _PSCOM_IVSHMEM_H_
 #define _PSCOM_IVSHMEM_H_
 
-#include <stdint.h>
-#include <stddef.h>
 #include "list.h"
-#include "pscom_types.h"
 #include "pscom_plugin.h"
+#include "pscom_types.h"
 #include "psivshmem.h"
+#include <stddef.h>
+#include <stdint.h>
 
 #if !(defined(__KNC__) || defined(__MIC__))
 #define IVSHMEM_BUFS 8
@@ -57,11 +57,11 @@ typedef struct ivshmem_msg_s {
 // contact endpoint info
 typedef struct psivshmem_info_msg_s {
 
-	void *direct_base;	/* base pointer of the IVM shared mem segment */	
+	void *direct_base;	/* base pointer of the IVM shared mem segment */
 	signed long direct_offset;
 
 	long ivshmem_buf_offset;
-	uuid_t uuid;	/*device identification */ 
+	uuid_t uuid;	/*device identification */
 
 } psivshmem_info_msg_t;
 
@@ -96,9 +96,9 @@ typedef struct ivshmem_conn_s {
 
 typedef struct ivshmem_info_msg_s {
 	int ivshmem_id;
-	int direct_ivshmem_id;      /* shm direct shared mem id */ 
-	void *direct_base;      /* base pointer of the shared mem segment */ 
-} ivshmem_info_msg_t; 
+	int direct_ivshmem_id;      /* shm direct shared mem id */
+	void *direct_base;      /* base pointer of the shared mem segment */
+} ivshmem_info_msg_t;
 
 
 

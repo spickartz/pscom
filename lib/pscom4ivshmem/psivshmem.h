@@ -7,12 +7,12 @@
 #define _PSIVSHMEM_H_
 
 #include <limits.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <uuid/uuid.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <uuid/uuid.h>
 
-#include "metadata.h" // include metadata struct && keep it synced with 
+#include "metadata.h" // include metadata struct && keep it synced with
 
 #define UIO_MAX_NAME_SIZE 65
 #define UUID_STRG_LENGTH 37
@@ -54,7 +54,7 @@ typedef struct ivshmem_pci_dev_s {
 	// adresses
 	char* ivshmem_base;
 	char* bitmap;
-	
+
 } ivshmem_pci_dev_t;
 
 
@@ -63,7 +63,7 @@ typedef struct ivshmem_pci_dev_s {
 
 //prototypes:
 
-int psivshmem_init_uio_device(ivshmem_pci_dev_t*); // init the device 
+int psivshmem_init_uio_device(ivshmem_pci_dev_t*); // init the device
 static void psivshmem_init_device_handle(ivshmem_pci_dev_t*);
 static int psivshmem_atomic_TestAndSet(unsigned char volatile*);
 int psivshmem_find_uio_device(ivshmem_pci_dev_t*);
