@@ -2,22 +2,22 @@
  * Author: Jonas Baude <jonas.baude@rwth-aachen.de>
  */
 
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <assert.h>
-#include <sys/resource.h> // getrlimit
+#include "psivshmem.h"
+#include "perf.h"
 #include "pscom_priv.h"
 #include "pscom_util.h"
-#include "perf.h"
-#include "psivshmem.h"
-#include <semaphore.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <sys/stat.h>
+#include <assert.h>
 #include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <semaphore.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/resource.h> // getrlimit
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 int psivshmem_debug = 2;
 FILE *psivshmem_debug_stream = NULL;
@@ -32,7 +32,7 @@ FILE *psivshmem_debug_stream = NULL;
 
 
 static
-int psreadline_from_file(char *fname, char *lbuf) //(filename, linebufer) 
+int psreadline_from_file(char *fname, char *lbuf) //(filename, linebufer)
 {
 	char *s;
 	int i;
@@ -48,8 +48,8 @@ int psreadline_from_file(char *fname, char *lbuf) //(filename, linebufer)
 	return 0;
 }
 
-int psivshmem_init_uio_device(ivshmem_pci_dev_t *dev) // init the device 
-{   
+int psivshmem_init_uio_device(ivshmem_pci_dev_t *dev) // init the device
+{
     int n;
     struct dirent **namelist;
     FILE* fd;
@@ -59,20 +59,20 @@ int psivshmem_init_uio_device(ivshmem_pci_dev_t *dev) // init the device
     if (n<0) goto no_device;
 
     while(n--) {
-	
+
 	sprintf(file_path, "/sys/class/uio/%s/name", namelist[n]->d_name);
 
     	psreadline_from_file(file_path,dev->name);	// check name
-	if (strncmp(dev->name, DEVICE_NAME,7))  
-	{	
+	if (strncmp(dev->name, DEVICE_NAME,7))
+	{
 		free(namelist[n]);
 		continue; // wrong device name -> try next
 	}
-    
+
 	//if name suits try to open char_dev file and read dev_specs:
 
 	sprintf(file_path, "/dev/%s", namelist[n]->d_name);
-     	
+
 	dev->fd = open(file_path, O_RDWR);
 	if (dev->fd == -1) goto device_error;
 
@@ -86,15 +86,15 @@ int psivshmem_init_uio_device(ivshmem_pci_dev_t *dev) // init the device
 	psreadline_from_file(file_path, dev->version);
 	if (strncmp(dev->version, DEVICE_VERSION,5)) goto version_mismatch;
         void *map_addr = mmap(NULL,dev->mem_size_byte, PROT_READ|PROT_WRITE, MAP_SHARED, dev->fd,1 * getpagesize());  // last param. overloaded for ivshmem -> 2 memorysegments available; Reg.= 0;  Data = 1;
-	
-	DPRINT(5, "ivshmem: map_addr=%p",map_addr);	
 
-	dev->ivshmem_base = (char*) map_addr; 
- 	
+	DPRINT(5, "ivshmem: map_addr=%p",map_addr);
+
+	dev->ivshmem_base = (char*) map_addr;
+
 	psivshmem_init_device_handle(dev);
-	
-	if(*(dev->first_byte) != IVSHMEM_DEVICE_MAGIC) goto device_collision;	
-	
+
+	if(*(dev->first_byte) != IVSHMEM_DEVICE_MAGIC) goto device_collision;
+
 	free(namelist);
 	dev->status = IVSHMEM_INITIALIZED;
 	return 0;
@@ -124,18 +124,18 @@ version_mismatch:
 
 int psivshmem_close_device(ivshmem_pci_dev_t *dev)
 {
-int ret_madvise; 
+int ret_madvise;
 int ret_msync;
 
 	if (dev->status != IVSHMEM_INITIALIZED) return -1;
 
-	ret_madvise = posix_madvise((void*)dev->ivshmem_base, dev->mem_size_byte,POSIX_MADV_DONTNEED);	
+	ret_madvise = posix_madvise((void*)dev->ivshmem_base, dev->mem_size_byte,POSIX_MADV_DONTNEED);
 	assert(munmap((void*)dev->ivshmem_base, dev->mem_size_byte) == 0);
 	close(dev->fd);
 	memset(dev, 0, sizeof(ivshmem_pci_dev_t));  // init with zeros
 	DPRINT(1,"ivshmem: device closed");
-	return 0;	
-	// ToDo: Check returnvalue of close(dev->fd); 
+	return 0;
+	// ToDo: Check returnvalue of close(dev->fd);
 }
 
 
@@ -149,9 +149,9 @@ void psivshmem_init_wait(ivshmem_pci_dev_t* dev){
     const int wait_treshold = 500; // results in a max time waste of 500 x 100 mic-sec = 0.05 sec
 
     for(n=0; n<wait_treshold; n++){
-      usleep(100); //wait 100 microseconds 
-      if(!uuid_is_null(*((uuid_t*)dev->uuid)) && (*(dev->first_byte) == IVSHMEM_DEVICE_MAGIC)) return;    
-    }	
+      usleep(100); //wait 100 microseconds
+      if(!uuid_is_null(*((uuid_t*)dev->uuid)) && (*(dev->first_byte) == IVSHMEM_DEVICE_MAGIC)) return;
+    }
 }
 
 
@@ -181,7 +181,7 @@ void psivshmem_init_device_handle(ivshmem_pci_dev_t *dev){
     } else {
     /* active waiting until other process has initialized the shared meta data
      * otherwise a device collision will be detected psivshmem_init_uio_device()
-     */ 
+     */
     psivshmem_init_wait(dev);
     }
 
@@ -193,7 +193,7 @@ void psivshmem_init_device_handle(ivshmem_pci_dev_t *dev){
 static
 int psivshmem_atomic_TestAndSet(unsigned char volatile* lock_byte){
 /*
- *  This function provides atomic test-and-set 
+ *  This function provides atomic test-and-set
  */
         return  __sync_bool_compare_and_swap(lock_byte,0,1);
 }
@@ -206,10 +206,10 @@ unsigned long long test_alloc(ivshmem_pci_dev_t *dev, size_t size){
  *
  * param: size = # of needed _frames_
  *
- * returns index of first free frame 
+ * returns index of first free frame
  * returns -1 if memory is filled
  *
- * */	
+ * */
     unsigned long long n;
     unsigned long long cnt = 0;
 
@@ -222,10 +222,10 @@ unsigned long long test_alloc(ivshmem_pci_dev_t *dev, size_t size){
 	{
 	    cnt = 0;
 	}
-		
-	// return index of first free frame belonging to a block of at least N free frames! 
+
+	// return index of first free frame belonging to a block of at least N free frames!
 	if (cnt >= size) {
-	return (n - cnt + 1); // return index of first free frame belonging to a block of at least N free frames! 
+	return (n - cnt + 1); // return index of first free frame belonging to a block of at least N free frames!
 	}
     }
     return -1; //not enough memory
@@ -235,7 +235,7 @@ unsigned long long test_alloc(ivshmem_pci_dev_t *dev, size_t size){
 static
 int psivshmem_ptr_in_dev(ivshmem_pci_dev_t *dev, char * ptr)
 {
-    // This function checks, if a given pointer points to memory inside the pci device memory or not. 
+    // This function checks, if a given pointer points to memory inside the pci device memory or not.
     return dev->ivshmem_base <= ptr && ptr < (dev->ivshmem_base + dev->mem_size_byte);
 }
 
@@ -246,19 +246,19 @@ int psivhmem_free_frame(ivshmem_pci_dev_t *dev, char * frame_ptr)
  * first implementation: just clear corresponding bit in bitmap -> frame is available again
  *
  */
-    unsigned long long n; 
+    unsigned long long n;
     unsigned long long index;
 
     if(!psivshmem_ptr_in_dev(dev, frame_ptr)) return -1;
 
     index = (frame_ptr - dev->ivshmem_base) / dev->frame_size;
- 
+
     pthread_spin_lock(dev->spinlock);
- 
+
 	CLR_BIT(dev->bitmap,index);
 
     pthread_spin_unlock(dev->spinlock);
-   
+
     return 0;
 }
 
@@ -273,7 +273,7 @@ int psivshmem_free_mem(ivshmem_pci_dev_t *dev, char * frame_ptr, size_t size)
  *
  *
  */
-    unsigned long long n; 
+    unsigned long long n;
     unsigned long long index_low, index_high;
 
     if(!psivshmem_ptr_in_dev(dev, frame_ptr)) return -1;
@@ -281,13 +281,13 @@ int psivshmem_free_mem(ivshmem_pci_dev_t *dev, char * frame_ptr, size_t size)
 
     index_low = (frame_ptr - dev->ivshmem_base) / dev->frame_size; //has to be a multiple of it!
     index_high = (frame_ptr - dev->ivshmem_base + size + (dev->frame_size - 1)) / dev->frame_size;
- 
+
     pthread_spin_lock(dev->spinlock);
 
-        for(n = index_low; n<=index_high;n++) {  //'unlock' all N used frames 	   
+        for(n = index_low; n<=index_high;n++) {  //'unlock' all N used frames
 	    CLR_BIT(dev->bitmap, n);
 	}
-   
+
     pthread_spin_unlock(dev->spinlock);
 
 return 0;
@@ -304,7 +304,7 @@ void *psivshmem_alloc_mem(ivshmem_pci_dev_t *dev, size_t sizeByte)
     frame_qnt = (sizeByte + (dev->frame_size - 1)) / dev->frame_size;
 
     pthread_spin_lock(dev->spinlock);
-    
+
     	index = test_alloc(dev ,frame_qnt);
 
 	DPRINT(5,"ivshmem: psivshmem_alloc_memory: index= %ld\n",index);
@@ -317,9 +317,9 @@ void *psivshmem_alloc_mem(ivshmem_pci_dev_t *dev, size_t sizeByte)
 		SET_BIT(dev->bitmap,n);  //ToDo: maybe possible: macro to set more bits "at once"
 		DPRINT(5,"ivshmem: psivshmem_alloc_memory:  <SET_BIT no %ld>\n",n);
 	}
-    
+
     pthread_spin_unlock(dev->spinlock);
-   
+
     ptr = (void*)(dev->ivshmem_base + (long long)(index * dev->frame_size));
 
     return ptr;

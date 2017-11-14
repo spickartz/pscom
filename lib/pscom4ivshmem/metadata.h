@@ -10,7 +10,7 @@
 
 
 typedef struct meta_data{
-    
+
     int magic;
     sem_t meta_semaphore;
     char hostname[65];
