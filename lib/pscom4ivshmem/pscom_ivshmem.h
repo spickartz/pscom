@@ -29,7 +29,7 @@
 #include <stdint.h>
 
 #if !(defined(__KNC__) || defined(__MIC__))
-#define IVSHMEM_BUFS 8
+#define IVSHMEM_BUFS 32
 #define IVSHMEM_BUFLEN (8192 - sizeof(ivshmem_msg_t))
 #else
 /* On KNC use more, but much smaller shm buffers. Using direct shm to archive a good throughput. */
